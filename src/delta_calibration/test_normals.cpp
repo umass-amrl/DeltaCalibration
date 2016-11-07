@@ -135,7 +135,19 @@ void testNormals(string bagfile) {
           &keyframe_k1, &keyframe_k2, &timestamp_1, &timestamp_2);
 
   pcl::PointCloud<pcl::Normal> normals = GetNormals(keyframe_k1);
-  visualization_msgs::MarkerArray markers;
+  visualization_msgs::Marker marker;
+  marker.header.frame_id = "point_cloud";
+  marker.id = 0;
+  marker.header.stamp = ros::Time();
+  marker.type = visualization_msgs::Marker::SPHERE_LIST;
+  marker.action = visualization_msgs::Marker::ADD;
+  marker.scale.x = .02;
+  marker.scale.y = .02;
+  marker.scale.z = .02;
+  marker.color.r = 0;
+  marker.color.a = 1;
+  marker.color.b = 0;
+  marker.color.g = 1;
   for(size_t i = 0; i < normals.size(); i++) {
     pcl::Normal normal = normals[i];
     double norm = 
@@ -144,22 +156,34 @@ void testNormals(string bagfile) {
     double x = normal.normal_x / norm;
     double y = normal.normal_y / norm;
     double z = normal.normal_z / norm;
-    visualization_msgs::Marker marker;
-    marker.header.frame_id = "point_cloud";
-    marker.id = i;
-    marker.header.stamp = ros::Time();
-    marker.type = visualization_msgs::Marker::SPHERE;
-    marker.action = visualization_msgs::Marker::ADD;
-    marker.scale.x = .2;
-    marker.scale.y = .2;
-    marker.scale.z = .2;
-    marker.color.r = 0;
-    marker.color.a = 1;
-    marker.color.b = 0;
-    marker.color.g = 1;
-    marker.pose.position.x = x;
-    marker.pose.position.y = y;
-    marker.pose.position.z = z;
+//     visualization_msgs::Marker marker;
+//     marker.header.frame_id = "point_cloud";
+//     marker.id = i;
+//     marker.header.stamp = ros::Time();
+//     marker.type = visualization_msgs::Marker::SPHERE;
+//     marker.action = visualization_msgs::Marker::ADD;
+//     marker.scale.x = .02;
+//     marker.scale.y = .02;
+//     marker.scale.z = .02;
+//     marker.color.r = 0;
+//     marker.color.a = 1;
+//     marker.color.b = 0;
+//     marker.color.g = 1;
+//     marker.pose.position.x = x;
+//     marker.pose.position.y = y;
+//     marker.pose.position.z = z;
+    geometry_msgs::Point point;
+    point.x = x;
+    point.y = y;
+    point.z = z;
+    marker.points.push_back(point);
+  }
+  int i = 0;
+  while(true) {
+    cout << "publishing" << endl;
+    PublishCloud(keyframe_k1, cloud_pub);
+    marker_pub.publish(marker);
+    i++;
   }
 }
 
@@ -195,6 +219,6 @@ int main(int argc, char **argv) {
   markerArray_pub =
   n.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 
 10);
-
+  testNormals(bagFile);
   return 0;
 }

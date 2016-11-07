@@ -1571,6 +1571,21 @@ void VisualizeCovariance(
   file.close();
 }
 
+pcl::PointCloud<pcl::PointXYZ> VoxelFilter(pcl::PointCloud<pcl::PointXYZ> cloud) {
+  pcl::PCLPointCloud2::Ptr cloud_filtered (new pcl::PCLPointCloud2 ());
+  pcl::PCLPointCloud2::Ptr ptr_cloud (new pcl::PCLPointCloud2 ());
+  pcl::toPCLPointCloud2(cloud, *ptr_cloud);
+  pcl::PointCloud<pcl::PointXYZ> cloud2;
+  // Create the filtering object
+  pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
+  sor.setInputCloud (ptr_cloud);
+  sor.setLeafSize (0.01f, 0.01f, 0.01f);
+  sor.filter (*cloud_filtered);
+  
+  pcl::fromPCLPointCloud2(*cloud_filtered, cloud2);
+  return cloud2;
+}
+
 pcl::PointCloud<pcl::Normal> GetNormals(
     const pcl::PointCloud<pcl::PointXYZ>& cloud) {
 
@@ -1581,6 +1596,7 @@ pcl::PointCloud<pcl::Normal> GetNormals(
   // Create the normal estimation class, and pass the input dataset to it
   pcl::NormalEstimationOMP<pcl::PointXYZ, pcl::Normal> ne;
   ne.setInputCloud (ptr_cloud);
+  ne.setNumberOfThreads(12);
   // Create an empty kdtree representation, and pass it to the normal estimation
   //     object.
   // Its content will be filled inside the object,
@@ -2103,7 +2119,7 @@ pcl::PointCloud<pcl::PointXYZ> CloudFromVector(
         }
         cloud[i] = point;
     }
-    return cloud;
+    return VoxelFilter(cloud);
 }
 
 // Reads clouds from a given iterator, saves to buffer if they are over
@@ -2189,9 +2205,7 @@ rosbag::View::iterator GetCloudsOne(rosbag::View::iterator it,
   KinectRawDepthCam camera = KinectRawDepthCam();
   filter.setDepthCamera(&camera);
   string kinect_0 = "kinect_0";
-  //   cout << "buffer check" << endl;
   while((buffer1->size() == 0)) {
-    //     cout << "instantiate" << endl;
     const rosbag::MessageInstance &m = *it;
     sensor_msgs::ImagePtr imageMsg = m.instantiate<sensor_msgs::Image>();
     //cout << imageMsg->header.frame_id << endl;
@@ -2208,7 +2222,6 @@ rosbag::View::iterator GetCloudsOne(rosbag::View::iterator it,
         timestamps_1->push_back(imageMsg->header.stamp.toSec());
       
     }
-        cout << "advance" << endl;
     advance(it, 1);
   }
   return it;
@@ -2319,7 +2332,7 @@ rosbag::View::iterator OneSensorClouds(rosbag::View::iterator it,
   double k1_time = (*timestamps_1)[0];
   timestamps_1->pop_front();
   // return those two as the current clouds to use
-  (*cloud1) = cloud_k1;
+  (*cloud1) = VoxelFilter(cloud_k1);
   *time1 = k1_time;
   return it;
 }
@@ -2387,44 +2400,58 @@ rosbag::View::iterator TimeAlignedCloudsSlamBag(rosbag::View::iterator it,
 
 bool CheckChangeVel(double* pose, const int degree,
       const vector<double>& velocity_list) {
+  double trans_eps = .05;
   Eigen::Matrix<double,3,1> axis(pose[0], pose[1], pose[2]);
+  Eigen::Matrix<double,3,1> trans(pose[3], pose[4], pose[5]);
   const double angle = axis.norm();
   double angle_degree = (180/3.14) * angle;
+  double norm = trans.norm();
   //PrintPose(pose);
   cout << "angle degrees: " << (180/3.14) * angle << endl;
   //cout << "angle: " << angle << endl;
   double velocity = std::accumulate(velocity_list.begin(),
       velocity_list.end(), 0.0);
-  cout << velocity << endl;
   velocity = velocity / velocity_list.size();
   fprintf(stdout, "Velocity: %f\n", velocity);
-  cout << velocity_list.size() << endl << endl;
-  
-  if(abs(velocity) < .05) {
-    if ((angle_degree > degree) ) {
+  if(degree > 0) {
+    cout << "Degree" << endl;
+    if(abs(velocity) < .05) {
+      if ((angle_degree > degree)) {
+        cout << "TRUE" << endl;
+        return true;
+      }
+      else{
+        return false;
+      }
+    }
+  } else {
+    cout << "not degree" << endl;
+    cout << "Translation: " << norm << endl;
+    if ((angle_degree > degree) && norm > trans_eps) {
       return true;
     }
     else{
       return false;
     }
   }
-  else{
-    return false;
-  }
+  return false;
 }
 
-bool CheckChangeOdom(double* pose, const double& timestamp_1, const double& timestamp_2, const int& degree) {
+bool CheckChangeOdom(double* pose, double* previous_pose, const double& timestamp_1, const double& timestamp_2, const int& degree) {
   Eigen::Matrix<double,3,1> axis(pose[0], pose[1], pose[2]);
   const double angle = axis.norm();
+  Eigen::Matrix<double,3,1> axis_previous(previous_pose[0], previous_pose[1], previous_pose[2]);
+  const double angle_previous = axis_previous.norm();
   double angle_degree = (180/3.14) * angle;
   //PrintPose(pose);
   cout << "angle degrees: " << (180/3.14) * angle << endl;
   //cout << "angle: " << angle << endl;
   double velocity;
-  velocity = angle / (timestamp_1 - timestamp_2);
-  
+  velocity = angle_previous / (timestamp_1 - timestamp_2);
+  cout << "Velocity: " << velocity << endl;
   if(abs(velocity) < .05) {
     if ((angle_degree > degree) ) {
+      cout << "TRUE" << endl;
       return true;
     }
     else{

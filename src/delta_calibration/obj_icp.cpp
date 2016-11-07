@@ -52,7 +52,7 @@
 #include "opencv2/core/core.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
 #include <opencv2/highgui/highgui.hpp>
-#include "fspf/plane_filtering.h"
+#include "kinect/plane_filtering.h"
 #include "shared/util/popt_pp.h"
 #include <Eigen/Sparse>
 #include <Eigen/OrderingMethods>

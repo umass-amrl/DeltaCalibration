@@ -990,7 +990,7 @@ void DeltaCalculationOne(string bag_name,
   // Save normals and get size of normals
   all_normals.push_back(variables->k1_key_normal);
   // size_t size = all_normals[0].size();
-  int normal_size;
+//   int normal_size;
 
   if((variables->k1_buffer.size() == 0)){
     cout << "first " << endl;
@@ -1109,31 +1109,26 @@ rosbag::View::iterator ClosestOdom(rosbag::View::iterator it,
     double best_deltaT = 1000;
     nav_msgs::OdometryPtr best_odom;
     bool done = false;
+    double time;
+    double best_time;
     while(!done && it != end) {
-      cout << "message instance" << endl;
       const rosbag::MessageInstance &m = *it;
      
       nav_msgs::OdometryPtr odomMsg = m.instantiate<nav_msgs::Odometry>();
-      cout << "instantiate message" << endl;
-      double time = odomMsg->header.stamp.toSec();
-      cout << "timestamp" << endl;
-      cout << time << endl;
-      cout << timestamp << endl;
+      time = odomMsg->header.stamp.toSec();
       double deltaT = time - timestamp;
       deltaT = abs(deltaT);
-      cout << deltaT << endl;
       if(deltaT < best_deltaT) {
+        best_time = time;
         best_deltaT = deltaT;
         best_odom = odomMsg;
-        cout << "advancing" << endl;
         advance(it, 1);
       } else {
-        cout << "not less " << endl;
         done = true;
       }
     }
     keyframe_odom->clear();
-    keyframe_odom->push_back(timestamp);
+    keyframe_odom->push_back(best_time);
     keyframe_odom->push_back(best_odom->pose.pose.position.x);
     keyframe_odom->push_back(best_odom->pose.pose.position.y);
     keyframe_odom->push_back(best_odom->pose.pose.position.z);
@@ -1149,32 +1144,30 @@ double* find_delta_odoms(const vector<double>& current, const vector<double>& pr
   Eigen::Transform<double, 3, Eigen::Affine> previous_transform;
   // For the two poses create a transform
   double* posek = new double[6];
-  cout << "initialize translation" << endl;
-  cout << current[0] << " " << current[1] << " " << current[2] << " " << current[3] << endl;
+  
   Eigen::Vector3d cur_translation;
   cur_translation[0] = current[1];
   cur_translation[1] = current[2];
   cur_translation[2] = current[3];
-  cout << "initialize rotation" << endl;
-  Eigen::Quaternion<double> current_quat(current[4], current[5], current[6], current[7]);
-//   Eigen::Transform<double, 3, Eigen::Affine> current_trans =
-//       current_translation * current_quat;
-      cout << "initialize rotation 2" << endl; 
-      Eigen::Quaternion<double> previous_quat(previous[4], previous[5], previous[6], previous[7]);
+  
+    // Build the affine transforms for the previous pose
+  Eigen::Quaternion<double> previous_quat(previous[7], previous[4], previous[5], previous[6]);
   Eigen::Translation<double, 3> previous_translation =
-      Eigen::Translation<double, 3>(current[1], current[2], current[3]);
-//   Eigen::Transform<double, 3, Eigen::Affine> previous_trans =
-//       previous_translation * previous_quat;   
-      cout << "Compute rotation" << endl;
-      Eigen::Quaternion<double> rotation = previous_quat.inverse() * current_quat;
-      cout << "compute translation" << endl;
-      cur_translation = (previous_quat * current_quat.inverse() * cur_translation);
-      cout << "merge translation" << endl;
+      Eigen::Translation<double, 3>(previous[1], previous[2], previous[3]);
+  
+  // Build the affine transforms based on the current pose
+  Eigen::Quaternion<double> current_quat(current[7], current[4], current[5], current[6]);
+  // Calculate delta rotation
+  Eigen::Quaternion<double> rotation = previous_quat.inverse() * current_quat;
+  // Calculate Delta Translation
+  cur_translation = (previous_quat * current_quat.inverse() * cur_translation);
   Eigen::Translation<double, 3> translation =
-      Eigen::Translation<double, 3>(cur_translation[1], cur_translation[2], cur_translation[3]);
-      cout << "merge transform" << endl;
+  Eigen::Translation<double, 3>(-cur_translation[0] + previous_translation.x(), -cur_translation[1] + previous_translation.y(), -cur_translation[2] + previous_translation.z());
   Eigen::Transform<double, 3, Eigen::Affine> transform =
       translation * rotation;
+      
+  transform = transform.inverse();
+ 
       
   // Find the rotation component
   // Find the angle axis format
@@ -1191,9 +1184,17 @@ double* find_delta_odoms(const vector<double>& current, const vector<double>& pr
   Eigen::Translation<double, 3> combined_translation(
     transform.translation());
   
-  posek[3] = -combined_translation.x() + previous_translation.x();
-  posek[4] = -combined_translation.y() + previous_translation.y();
-  posek[5] = -combined_translation.z() + previous_translation.z();
+  cout << "Current translation" << endl;
+  cout << current[1] << " " << current[2] << " " << current[3] << endl;
+  cout << "combined Translation" << endl;
+  cout << combined_translation.x() << " " << combined_translation.y() << " " << combined_translation.z() <<  endl;
+  cout << "Previous translation" << endl;
+  cout << previous_translation.x() << " " << previous_translation.y() << " " << previous_translation.z() <<  endl;
+  posek[3] = combined_translation.x();
+  posek[4] = combined_translation.y();
+  posek[5] = combined_translation.z();
+  cout << "Delta translation" << endl;
+  cout << posek[3] << " " << posek[4] << " " << posek[5] << " " << endl;
   // Recompute the rotation angle
   posek[0] = combined_axis(0);
   posek[1] = combined_axis(1);
@@ -1224,7 +1225,7 @@ void DeltaCalculationOdometry(string bag_name,
   rosbag::View view(bag, rosbag::TopicQuery(topics));
   std::vector<std::string> odom_topics;
   odom_topics.push_back(std::string("/odom"));
-  cout << "starting odom bag" << endl;
+//   cout << "starting odom bag" << endl;
   rosbag::View odom_view(bag, rosbag::TopicQuery(odom_topics));
   string str_key_normal_k1 = pcd_folder + "key_normal_k1";
   string str_key_normal_k2 = pcd_folder + "key_normal_k2";
@@ -1240,7 +1241,7 @@ void DeltaCalculationOdometry(string bag_name,
   bag_it = InitializeVariablesOne(bag_name, degree, bag_it, end, variables);
   vector<double> keyframe_odom, previous_odom;
   
-  cout << "closest odom 1" << endl;
+//   cout << "closest odom 1" << endl;
   odom_it = ClosestOdom(odom_it, odom_end, variables->k1_timestamp, &keyframe_odom);
   previous_odom = keyframe_odom;
   ofstream pose_file (variables->pose_name.c_str());
@@ -1254,10 +1255,10 @@ void DeltaCalculationOdometry(string bag_name,
   int normal_size;
   
   if((variables->k1_buffer.size() == 0)){
-    cout << "first " << endl;
+//     cout << "first " << endl;
   }
   if(bag_it == variables->end){
-    cout << "second " << endl;
+//     cout << "second " << endl;
     cout << variables->k1_keyframe.size() << endl;
   }
   // While there are still clouds in both datasets
@@ -1271,13 +1272,13 @@ void DeltaCalculationOdometry(string bag_name,
                            &variables->k1_timestamps,
                            &k1_cloud, &variables->k1_timestamp);
   vector<double> current_odom;
-  cout << "closest odom" << endl;
+//   cout << "closest odom" << endl;
   odom_it = ClosestOdom(odom_it, odom_end, variables->k1_timestamp, &current_odom);
   pcl::PointCloud<pcl::Normal> k1_normal;
   pcl::PointCloud<pcl::Normal> k2_normal;
   // Get normals for the two clouds
   k1_normal = GetNormals(k1_cloud);
-  
+  PublishCloud(k1_cloud,cloud_pub_3);
   // If the residual distance between either of these clouds (unmodified) and
   // the clouds k - 1 is large enough continue (otherwise read in new clouds)
   double k1_calculated_delta[6];
@@ -1290,7 +1291,7 @@ void DeltaCalculationOdometry(string bag_name,
                                           k1_calculated_delta);
   // Accumulate and write velocities
   const double k1_velocity = k1_residual / (variables->k1_timestamp - variables->k1_prev_timestamp);
-  cout << "compute velocity" << endl;
+//   cout << "compute velocity" << endl;
   variables->k1_velocity_list[count % avg_len] = k1_velocity;
   double k1_acc_velocity =
   std::accumulate(variables->k1_velocity_list.begin(), variables->k1_velocity_list.end(), 0.0);
@@ -1315,15 +1316,19 @@ void DeltaCalculationOdometry(string bag_name,
   // Check the magnitude of translation and angle of rotation, if larger
   // than some threshold, this is our next keyframe
   // If there has been sufficient change update keyframe and save deltas
-  cout << "check delta odom" << endl;
   double* previous_odom_delta = find_delta_odoms(current_odom, previous_odom);
+  
+  double* odom_delta = find_delta_odoms(current_odom, keyframe_odom);
+  cout << endl;
   cout << "check delta odom" << endl;
   bool k1_change = CheckChangeVel(variables->k1_combined_transform, degree, variables->k1_velocity_list);
   cout << "check change odom" << endl;
-  bool k2_change = CheckChangeOdom(previous_odom_delta, current_odom[0], previous_odom[0],  degree);
+  bool k2_change = CheckChangeOdom(odom_delta, previous_odom_delta, current_odom[0], previous_odom[0],  degree);
+  cout << endl;
   if(k1_change && k2_change) {
     dist_okay = false;
     double* odom_delta = find_delta_odoms(current_odom, keyframe_odom);
+    cout << endl;
     keyframe_odom = current_odom;
     vector<double> pose0(6, 0.0);
     variables->k1_keyframe = k1_cloud;
@@ -1331,7 +1336,7 @@ void DeltaCalculationOdometry(string bag_name,
     variables->keys.push_back(count);
     
     WritePoseFile(variables->k1_combined_transform, variables->k1_timestamp, count, pose_file);
-    cout << "writing odom_delta" << endl;
+//     cout << "writing odom_delta" << endl;
     WritePoseFile(odom_delta, variables->k1_timestamp, count, pose_file);
     pose_file << endl;
     

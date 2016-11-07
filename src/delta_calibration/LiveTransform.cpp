@@ -39,7 +39,7 @@
 #include "opencv2/core/core.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
 #include <opencv2/highgui/highgui.hpp>
-#include "fspf/plane_filtering.h"
+#include "kinect/plane_filtering.h"
 #include "shared/util/popt_pp.h"
 #include <Eigen/Sparse>
 #include <Eigen/OrderingMethods>
@@ -138,6 +138,41 @@ void TransformPointCloud_PCL(
   }
 }
 
+// Transforms a given eigen point by the given transform (array input)
+template <class T> Eigen::Matrix<T,3,1> TransformPoint(
+  const Eigen::Matrix<T,3,1>& point,
+  const T* transform) {
+  T point_t[] = {T(point.x()), T(point.y()), T(point.z())};
+  T transformed_point[3];
+  
+  ceres::AngleAxisRotatePoint(transform, point_t, transformed_point);
+  for (int i = 0; i < 3; ++i) {
+    transformed_point[i] += transform[3 + i];
+  }
+  return (Eigen::Matrix<T, 3, 1>(
+    transformed_point[0],
+    transformed_point[1],
+    transformed_point[2]));
+  }
+
+// Transforms all points in a pcl point cloud (array input)
+void TransformPointCloud(
+  pcl::PointCloud<pcl::PointXYZ>& cloud,
+  double transform[6]) {
+  for(size_t i = 0; i < cloud.size(); ++i) {
+    pcl::PointXYZ point = cloud[i];
+    
+    Eigen::Matrix<double,3,1> point_matrix;
+    Eigen::Matrix<double,3,1> transformed_point_matrix;
+    point_matrix << point.x, point.y, point.z;
+    transformed_point_matrix = TransformPoint(point_matrix, transform);
+    point.x = transformed_point_matrix[0];
+    point.y = transformed_point_matrix[1];
+    point.z = transformed_point_matrix[2];
+    cloud[i] = point;
+  }
+  }
+
 // Transforms all points in a pcl point cloud (vector input)
 void TransformPointCloud_PCL(
   pcl::PointCloud<pcl::PointXYZ>& cloud, 
@@ -161,12 +196,61 @@ pcl::PointCloud<pcl::PointXYZ> CloudFromVector(
 
         pcl::PointXYZ point;
         point.x = pointCloud[i](0);
-        point.z = pointCloud[i](1);
-        point.y=  pointCloud[i](2);
+        point.y = pointCloud[i](1);
+        point.z=  pointCloud[i](2);
         cloud[i] = point;
     }
     return cloud;
 }
+
+// Transforms a given eigen point by the given transform (array input)
+template <class T> Eigen::Matrix<T,3,1> TransformPointInv(
+  const Eigen::Matrix<T,3,1>& point,
+  const T transform[6]) {
+  
+  //Create the eigen transform from the camera
+  Eigen::Matrix<T,3,1> axis(transform[0], transform[1], transform[2]);
+  const T angle = axis.norm();
+  if (angle > T(0)) {
+    axis = axis / angle;
+  }
+  
+  const Eigen::Transform<T, 3, Eigen::Affine> rotation =
+  Eigen::Transform<T, 3, Eigen::Affine>(
+    Eigen::AngleAxis<T>(angle, axis));
+  
+  // const Eigen::Translation<T, 3> translation =
+  // Eigen::Translation<T, 3>(transform[3], transform[4], transform[5]);
+  Eigen::Matrix<T,3,1> transformed_point = point;
+  // Compute the full transform
+  Eigen::Transform<T, 3, Eigen::Affine> affine_transform =
+  rotation;
+  
+  transformed_point =  affine_transform.inverse() * transformed_point;
+  for (int i = 0; i < 3; ++i) {
+    transformed_point[i] += transform[3 + i];
+  }
+  return transformed_point;
+  }
+
+// Transforms all points in a pcl point cloud (array input)
+void TransformPointCloudInv(
+  pcl::PointCloud<pcl::PointXYZ>& cloud,
+  double transform[6]) {
+
+  for(size_t i = 0; i < cloud.size(); ++i) {
+    pcl::PointXYZ point = cloud[i];
+    
+    Eigen::Matrix<double,3,1> point_matrix;
+    Eigen::Matrix<double,3,1> transformed_point_matrix;
+    point_matrix << point.x, point.y, point.z;
+    transformed_point_matrix = TransformPointInv(point_matrix, transform);
+    point.x = transformed_point_matrix[0];
+    point.y = transformed_point_matrix[1];
+    point.z = transformed_point_matrix[2];
+    cloud[i] = point;
+  }
+  }
 
 // Reads clouds from a given iterator, saves to buffer if they are over
 rosbag::View::iterator get_clouds(rosbag::View::iterator it,
@@ -441,7 +525,7 @@ void k1Callback(const sensor_msgs::ImagePtr& imageMsg) {
   filter.GenerateCompletePointCloud((void*)imageMsg->data.data(),
     pointCloud, pixelLocs);
   pcl::PointCloud<pcl::PointXYZ> pcl_cloud = CloudFromVector(pointCloud, pixelLocs);
-  TransformPointCloud_PCL(pcl_cloud, rotation);
+//   TransformPointCloud_PCL(pcl_cloud, rotation);
   publish_cloud(pcl_cloud, cloud_pub);
 }
 
@@ -450,17 +534,37 @@ void k0Callback(const sensor_msgs::ImagePtr& imageMsg) {
   PlaneFilter filter;
   KinectRawDepthCam camera = KinectRawDepthCam();
   filter.setDepthCamera(&camera);
-  double  transform[] = {2.6976, 0.0656, -1.6419, 0.0266, 0.0175, 0.0431}; // Manually inserted transform (calculated by delta-cal)
-  double  rotation[] = {1.74, 0, 0, 0, 0, 0};
+  double  transform[] = {-0.068301, -0.045674, -0.821404, 0.175078, 0.328037, -0.008551}; // Manually inserted transform (calculated by delta-cal)
+//   double  rotation[] = {1.74, 0, 0, 0, 0, 0};
   vector<Eigen::Vector3f> pointCloud;
   vector<int> pixelLocs;
   filter.GenerateCompletePointCloud((void*)imageMsg->data.data(),
     pointCloud, pixelLocs);
   pcl::PointCloud<pcl::PointXYZ> pcl_cloud = CloudFromVector(pointCloud, pixelLocs);
   publish_cloud(pcl_cloud, cloud_pub_2);
-  TransformPointCloud_PCL(pcl_cloud, transform);
-  TransformPointCloud_PCL(pcl_cloud, rotation);
+  TransformPointCloud(pcl_cloud, transform);
+//   TransformPointCloud_PCL(pcl_cloud, rotation);
   publish_cloud(pcl_cloud, cloud_pub_3);
+}
+
+void k2Callback(const sensor_msgs::ImagePtr& imageMsg) {
+  cout << "Callback" << endl;
+  PlaneFilter filter;
+  KinectRawDepthCam camera = KinectRawDepthCam();
+  filter.setDepthCamera(&camera);
+  double  transform2[] = {-0.068301, -0.045674, -0.821404, 0.175078, 0.328037, -0.008551};
+  double  transform[] = {0.046762, 0.057088, -1.266204, -0.020668, -0.091885, 0.016660}; // Manually inserted transform (calculated by delta-cal)
+  //   double  rotation[] = {1.74, 0, 0, 0, 0, 0};
+  vector<Eigen::Vector3f> pointCloud;
+  vector<int> pixelLocs;
+  filter.GenerateCompletePointCloud((void*)imageMsg->data.data(),
+                                    pointCloud, pixelLocs);
+  pcl::PointCloud<pcl::PointXYZ> pcl_cloud = CloudFromVector(pointCloud, pixelLocs);
+//   publish_cloud(pcl_cloud, cloud_pub_2);
+  TransformPointCloud(pcl_cloud, transform);
+  TransformPointCloud(pcl_cloud, transform2);
+  //   TransformPointCloud_PCL(pcl_cloud, rotation);
+  publish_cloud(pcl_cloud, cloud_pub_4);
 }
 
 int main(int argc, char **argv) {
@@ -511,6 +615,7 @@ int main(int argc, char **argv) {
 
   ros::Subscriber sub_k0 = n.subscribe("Cobot/Kinect/Depth0", 10, k0Callback);
   ros::Subscriber sub_k1 = n.subscribe("Cobot/Kinect/Depth1", 10, k1Callback);
+  ros::Subscriber sub_k2 = n.subscribe("Cobot/Kinect/Depth2", 10, k2Callback);
   /**
    * ros::spin() will enter a loop, pumping callbacks.  With this version, all
    * callbacks will be called from within this thread (the main one).  ros::spin()

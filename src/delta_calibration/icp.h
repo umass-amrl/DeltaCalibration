@@ -33,6 +33,7 @@
 #include <pcl/search/kdtree.h>
 #include <pcl/search/search.h>
 #include <pcl/kdtree/kdtree.h>
+#include <pcl/filters/voxel_grid.h>
 // Ceres Includes
 #include "ceres/ceres.h"
 #include "ceres/rotation.h"
@@ -212,6 +213,8 @@ void VisualizeCovariance(
     const string bagfile,
     const ceres::CRSMatrix& jacobian);
 
+pcl::PointCloud<pcl::PointXYZ> VoxelFilter(pcl::PointCloud<pcl::PointXYZ> cloud);
+
 pcl::PointCloud<pcl::Normal> GetNormals(
     const pcl::PointCloud<pcl::PointXYZ>& cloud);
 
@@ -347,7 +350,7 @@ rosbag::View::iterator TimeAlignedClouds(rosbag::View::iterator it,
 bool CheckChangeVel(double* pose, const int degree,
       const vector<double>& velocity_list);
 
-bool CheckChangeOdom(double* pose, const double& timestamp_1, const double& timestamp_2, const int& degree);
+bool CheckChangeOdom(double* pose, double* previous_pose, const double& timestamp_1, const double& timestamp_2, const int& degree);
 
 bool CheckChange(double* pose, const int degree);
 
