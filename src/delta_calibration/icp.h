@@ -49,11 +49,10 @@
 #include <Eigen/OrderingMethods>
 
 // OPENMP_PARALLEL_FOR
-// #include "vector_localization/residual_functors.h"
 #include "shared/util/openmp_utils.h"
 #include <fstream>
 
-#include "kdtree.h"
+#include "perception_tools/kdtree.h"
 
 // #include "kinect/lib/freenect_internal.h"
 // #include "kinect/include/libfreenect.h"
