@@ -49,8 +49,8 @@
 #include <Eigen/OrderingMethods>
 
 // OPENMP_PARALLEL_FOR
-#include "vector_localization/residual_functors.h"
-
+// #include "vector_localization/residual_functors.h"
+#include "shared/util/openmp_utils.h"
 #include <fstream>
 
 #include "kdtree.h"
