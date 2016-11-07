@@ -1,56 +1,5 @@
 //----------- INCLUDES
-#include <string>
-#include <sstream>
-#include <iostream>
-#include <fstream>
-#include <iterator>
-#include <algorithm>
-#include <cmath>
-#include <math.h>
-// ROS INCLUDES
-#include <ros/ros.h>
-#include <rosbag/bag.h>
-#include <rosbag/view.h>
-#include <sensor_msgs/image_encodings.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <visualization_msgs/Marker.h>
-#include <visualization_msgs/MarkerArray.h>
-
-// PCL specific includes
-#include <pcl_conversions/pcl_conversions.h>
 #include <pcl/common/common.h>
-#include <nav_msgs/Odometry.h>
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
-#include <pcl/kdtree/kdtree_flann.h>
-#include <pcl/common/transforms.h>
-#include <pcl/io/pcd_io.h>
-#include <pcl/io/ply_io.h>
-#include <pcl/io/obj_io.h>
-#include <pcl/pcl_exports.h>
-#include <pcl/console/parse.h>
-#include <pcl/features/normal_3d.h>
-#include <pcl/features/normal_3d_omp.h>
-// Ceres Includes
-#include "ceres/ceres.h"
-#include "ceres/rotation.h"
-// OTHER
-#include "opencv2/core/core.hpp"
-#include "opencv2/imgproc/imgproc.hpp"
-#include <opencv2/highgui/highgui.hpp>
-#include "kinect/plane_filtering.h"
-#include "shared/util/popt_pp.h"
-#include <Eigen/Geometry>
-#include <Eigen/Sparse>
-#include <Eigen/OrderingMethods>
-
-// OPENMP_PARALLEL_FOR
-#include "vector_localization/residual_functors.h"
-
-#include <fstream>
-
-#include "kdtree.h"
-
 #include "delta_calibration/icp.h"
 
 using namespace icp;
@@ -106,21 +55,7 @@ void find_z(string bag_file, string transform_file, vector<ros::Publisher> publi
   bag_it = OneSensorClouds(bag_it, end, &buffer,
                            &timestamps,
                            &cloud, &time);
-  
-  // Transform the cloud
-  int i = 0;
-//   while(i < 10) {
-//   PublishCloud(cloud, cloud_pub_1);
-//   i++;
-//   sleep(2);
-//   }
-//   TransformPointCloudInv(cloud, transform);
-//   i = 0;
-//   while(i < 10) {
-//   PublishCloud(cloud, cloud_pub_2);
-//   i++;
-//     sleep(2);
-//   }
+
   
   // Naively find the greatest z value as the height
   pcl::PointXYZ min, max;

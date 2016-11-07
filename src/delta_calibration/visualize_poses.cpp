@@ -1,55 +1,6 @@
 //----------- INCLUDES
-#include <string>
-#include <sstream>
-#include <iostream>
-#include <fstream>
-#include <iterator>
-#include <algorithm>
-#include <cmath>
-#include <math.h>
 // ROS INCLUDES
-#include <ros/ros.h>
-#include <rosbag/bag.h>
-#include <rosbag/view.h>
-#include <sensor_msgs/image_encodings.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <visualization_msgs/Marker.h>
-#include <visualization_msgs/MarkerArray.h>
-
-// PCL specific includes
-#include <pcl_conversions/pcl_conversions.h>
 #include <nav_msgs/Odometry.h>
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
-#include <pcl/kdtree/kdtree_flann.h>
-#include <pcl/common/transforms.h>
-#include <pcl/io/pcd_io.h>
-#include <pcl/io/ply_io.h>
-#include <pcl/io/obj_io.h>
-#include <pcl/pcl_exports.h>
-#include <pcl/console/parse.h>
-#include <pcl/features/normal_3d.h>
-#include <pcl/features/normal_3d_omp.h>
-// Ceres Includes
-#include "ceres/ceres.h"
-#include "ceres/rotation.h"
-// OTHER
-#include "opencv2/core/core.hpp"
-#include "opencv2/imgproc/imgproc.hpp"
-#include <opencv2/highgui/highgui.hpp>
-#include "kinect/plane_filtering.h"
-#include "shared/util/popt_pp.h"
-#include <Eigen/Geometry>
-#include <Eigen/Sparse>
-#include <Eigen/OrderingMethods>
-
-// OPENMP_PARALLEL_FOR
-#include "vector_localization/residual_functors.h"
-
-#include <fstream>
-
-#include "kdtree.h"
-
 #include "delta_calibration/icp.h"
 
 ros::Publisher cloud_pub_1;
@@ -84,7 +35,6 @@ rosbag::View::iterator OdomFromBag(rosbag::View::iterator it,
                                    vector<double>* keyframe_odom) {
    
     
-    double best_deltaT = 1000;
     nav_msgs::OdometryPtr best_odom;
     const rosbag::MessageInstance &m = *it; 
     nav_msgs::OdometryPtr odomMsg = m.instantiate<nav_msgs::Odometry>();
