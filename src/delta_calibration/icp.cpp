@@ -15,6 +15,7 @@ const float nn_dist = .05;
 float neighbor_dist = .05;
 vector<int> x_pos;
 vector<int> y_pos;
+
 // For checking if the mean has not changed
 bool DoubleEquals(double x, double y) {
   return fabs(x-y) < .000005;
@@ -25,18 +26,19 @@ bool HistogramEquals(double x, double y) {
 }
 
 void PublishCloud(
-    const pcl::PointCloud<pcl::PointXYZ>& cloud, ros::Publisher publisher) {
+                  const pcl::PointCloud<pcl::PointXYZ>& cloud, 
+                  ros::Publisher publisher) {
   sensor_msgs::PointCloud2 temp_cloud;
   pcl::PCLPointCloud2 pcl_cloud;
   pcl::toPCLPointCloud2(cloud, pcl_cloud);
   pcl_conversions::fromPCL(pcl_cloud, temp_cloud);
   temp_cloud.header.frame_id = "point_cloud";
-
   publisher.publish(temp_cloud);
 }
 
 void PublishCloud(
-    const pcl::PointCloud<pcl::PointXYZRGB>& cloud, ros::Publisher publisher) {
+                  const pcl::PointCloud<pcl::PointXYZRGB>& cloud, 
+                  ros::Publisher publisher) {
   sensor_msgs::PointCloud2 temp_cloud;
   pcl::PCLPointCloud2 pcl_cloud;
   pcl::toPCLPointCloud2(cloud, pcl_cloud);
@@ -46,12 +48,11 @@ void PublishCloud(
   publisher.publish(temp_cloud);
 }
 
-
-
 // Transforms a given eigen point by the given transform (array input)
 template <class T> Eigen::Matrix<T,3,1> TransformPoint(
-  const Eigen::Matrix<T,3,1>& point,
-  const T* transform) {
+    const Eigen::Matrix<T,3,1>& point,
+    const T* transform) {
+  
   T point_t[] = {T(point.x()), T(point.y()), T(point.z())};
   T transformed_point[3];
   
@@ -64,16 +65,7 @@ template <class T> Eigen::Matrix<T,3,1> TransformPoint(
     transformed_point[1],
     transformed_point[2]));
 }
-//     Eigen::Quaternion<T> quat_transform = Eigen::Quaternion<T>(T(pose[3]), T(pose[0]), T(pose[1]), T(pose[2]));
-//     transformed_point[0] = T(point[0]);
-//     transformed_point[1] = T(point[1]);
-//     transformed_point[2] = T(point[2]);
-//     Eigen::Transform<T, 3, Eigen::Affine> transform;
-//     transform = quat_transform;
-//     Eigen::Translation<T, 3> translation =
-//     Eigen::Translation<T, 3>(T(pose[4]), T(pose[5]), T(pose[6]));
-//     transform = translation * transform;
-//     transformed_point = transform * transformed_point;
+
 double* InvertTransform(double*  transform) {
   //Create the eigen transform from the camera
   Eigen::Matrix<double,3,1> axis(transform[0], transform[1], transform[2]);
@@ -128,14 +120,12 @@ template <class T> Eigen::Matrix<T,3,1> TransformPointInv(
   Eigen::Transform<T, 3, Eigen::Affine>(
     Eigen::AngleAxis<T>(angle, axis));
 
-  // const Eigen::Translation<T, 3> translation =
-  // Eigen::Translation<T, 3>(transform[3], transform[4], transform[5]);
   Eigen::Matrix<T,3,1> transformed_point = point;
   // Compute the full transform
   Eigen::Transform<T, 3, Eigen::Affine> affine_transform =
    rotation;
 
-   transformed_point =  affine_transform.inverse() * transformed_point;
+  transformed_point =  affine_transform.inverse() * transformed_point;
   for (int i = 0; i < 3; ++i) {
     transformed_point[i] += transform[3 + i];
   }
@@ -145,8 +135,8 @@ template <class T> Eigen::Matrix<T,3,1> TransformPointInv(
 // Transforms a given eigen point by the given transform (array containing quaternion)
 // Transforms a given eigen point by the given transform (array containing quaternion)
 Eigen::Matrix<double,3,1> TransformPointQuaternion(
-  const Eigen::Matrix<double,3,1>& point,
-  double* pose) {
+    const Eigen::Matrix<double,3,1>& point,
+    double* pose) {
   Eigen::Quaternion<double> quat_transform = Eigen::Quaternion<double>(pose[3], pose[0], pose[1], pose[2]);
   quat_transform.normalize();
   Eigen::Matrix<double,3,1> transformed_point;
@@ -157,55 +147,31 @@ Eigen::Matrix<double,3,1> TransformPointQuaternion(
   trans[0] = pose[4];
   trans[1] = pose[5];
   trans[2] = pose[6];
-  //   trans = quat_transform * trans;
   Eigen::Transform<double, 3, Eigen::Affine> transform;
   transform = quat_transform;
   Eigen::Translation<double, 3> translation =
   Eigen::Translation<double, 3>(trans[0], trans[1], trans[2]);
   transform = translation * transform;
   transformed_point = transform * transformed_point;
-  //   for (int i = 0; i < 3; ++i) {
-  //       transformed_point[i] -= trans[i];
-  //     }
   
   return (Eigen::Matrix<double, 3, 1>(
     transformed_point[0],
     transformed_point[1],
     transformed_point[2]));
   }
-  
-
-  
-  // Transforms a given eigen point by the given transform (array input)
-//   template <class T> Eigen::Matrix<T,3,1> TransformPoint(
-//     const Eigen::Matrix<T,3,1>& point,
-//     const T* transform) {
-//     T point_t[] = {T(point.x()), T(point.y()), T(point.z())};
-//     T transformed_point[3];
-//     
-//     ceres::AngleAxisRotatePoint(transform, point_t, transformed_point);
-//     for (int i = 0; i < 3; ++i) {
-//       transformed_point[i] += transform[3 + i];
-//     }
-//     return (Eigen::Matrix<T, 3, 1>(
-//       transformed_point[0],
-//       transformed_point[1],
-//       transformed_point[2]));
-//     }
-  
-
+ 
 // Translates along a given vector by given amount
 template <class T> Eigen::Matrix<T,3,1> VectorTranslate(
     const Eigen::Matrix<T,3,1>& point,
     const T magnitude,
     const Eigen::Matrix<T,3,1>& vector) {
-//     T point_t[] = {T(point.x()), T(point.y()), T(point.z())};
-    Eigen::Matrix<T,3,1> transformed_point;
-    transformed_point = point + (magnitude * vector);
-    return (Eigen::Matrix<T, 3, 1>(
-        transformed_point[0],
-        transformed_point[1],
-        transformed_point[2]));
+  
+  Eigen::Matrix<T,3,1> transformed_point;
+  transformed_point = point + (magnitude * vector);
+  return (Eigen::Matrix<T, 3, 1>(
+      transformed_point[0],
+      transformed_point[1],
+      transformed_point[2]));
 }
 
 
@@ -250,9 +216,7 @@ template <class T> Eigen::Matrix<T,2,1> TransformDifference(
     Eigen::Transform<T, 3, Eigen::Affine> difference =
         affine_transform.inverse() * affine_transform_base;
 
-//     // Find the rotation component
-//     // Find the angle axis format
-       Eigen::Matrix<T, 3, 3> matrix(difference.rotation());
+    Eigen::Matrix<T, 3, 3> matrix(difference.rotation());
 
     // Recompute the rotation angle
      T final_angle = acos((matrix(0,0), + matrix(1,1) + matrix(2,2) - (T)1)/(T)2);
@@ -264,11 +228,10 @@ template <class T> Eigen::Matrix<T,2,1> TransformDifference(
     return output;
 }
 
-
 // Transforms a given eigen point by the given transform (array input)
 template <class T> Eigen::Matrix<T,4,1> TransformPlane(
-        const Eigen::Matrix<T,4,1>& point,
-        const T transform[6]) {
+    const Eigen::Matrix<T,4,1>& point,
+    const T transform[6]) {
     T point_t[] = {T(point[0]), T(point[1]), T(point[2])};
     T transformed_point[3];
     ceres::AngleAxisRotatePoint(transform, point_t, transformed_point);
@@ -279,10 +242,8 @@ template <class T> Eigen::Matrix<T,4,1> TransformPlane(
         T(point[3])));
 }
 
-
-
-// Transforms a given eigen vector (not point!) by the given transform (array
-// input)
+// Transforms a given eigen vector (not point!) by the given transform 
+// (array input)
 template <class T> Eigen::Matrix<T,3,1> TransformVector(
     const Eigen::Matrix<T,3,1>& vector,
     const T transform[6]) {
@@ -306,7 +267,7 @@ void GeometryTransform(geometry_msgs::Point* point, const double transform[6]) {
   point->z = point_eig[2];
 }
 
-Eigen::Vector3d PointToDepthImage(pcl::PointXYZ point) {
+Eigen::Vector3d PointToDepthImage(const pcl::PointXYZ& point) {
   Eigen::Vector3d depth_point;
   double width = 480;
   double height = 640;
@@ -328,7 +289,7 @@ Eigen::Vector3d PointToDepthImage(pcl::PointXYZ point) {
 
 // Returns true if a point is not outside a central window
 // of the original depth image
-bool NotEdge(pcl::PointXYZ point) {
+bool NotEdge(const pcl::PointXYZ& point) {
 
   double width = 640;
   double height = 480;
@@ -362,14 +323,14 @@ bool NotEdge(pcl::PointXYZ point) {
 }
 
 double KdTreeNN(
-    const double nn_dist,
-    const pcl::PointCloud<pcl::PointXYZ>& pointcloud,
-    const pcl::PointCloud<pcl::PointXYZ>& transformed_cloud,
-    const pcl::PointCloud<pcl::Normal>& normal_1,
-    const pcl::PointCloud<pcl::Normal>& normal_2,
-    const vector<Eigen::Vector2d>& image_coords_1,
-    const vector<Eigen::Vector2d>& image_coords_2,
-    vector<int>& nearest_neigbors, vector<int>& start_points) {
+                const double nn_dist,
+                const pcl::PointCloud<pcl::PointXYZ>& pointcloud,
+                const pcl::PointCloud<pcl::PointXYZ>& transformed_cloud,
+                const pcl::PointCloud<pcl::Normal>& normal_1,
+                const pcl::PointCloud<pcl::Normal>& normal_2,
+                const vector<Eigen::Vector2d>& image_coords_1,
+                const vector<Eigen::Vector2d>& image_coords_2,
+                vector<int>& nearest_neigbors, vector<int>& start_points) {
 
   vector<double> residual_magnitudes;
 
@@ -532,11 +493,11 @@ void WritePose(double* pose, ofstream file) {
 
 // Transforms all points in a pcl point cloud (array input)
 void TransformPointCloud(
-    pcl::PointCloud<pcl::PointXYZ>& cloud,
-    double transform[6]) {
+                          pcl::PointCloud<pcl::PointXYZ>* cloud,
+                          double transform[6]) {
   OMP_PARALLEL_FOR
-  for(size_t i = 0; i < cloud.size(); ++i) {
-    pcl::PointXYZ point = cloud[i];
+  for(size_t i = 0; i < cloud->size(); ++i) {
+    pcl::PointXYZ point = (*cloud)[i];
 
     Eigen::Matrix<double,3,1> point_matrix;
     Eigen::Matrix<double,3,1> transformed_point_matrix;
@@ -545,14 +506,14 @@ void TransformPointCloud(
     point.x = transformed_point_matrix[0];
     point.y = transformed_point_matrix[1];
     point.z = transformed_point_matrix[2];
-    cloud[i] = point;
+    (*cloud)[i] = point;
   }
 }
 
 // Transforms all points in a pcl point cloud (array input)
 void TransformPointCloudQuat(
-  pcl::PointCloud<pcl::PointXYZ>& cloud,
-  double transform[7]) {
+    pcl::PointCloud<pcl::PointXYZ>& cloud,
+    double transform[7]) {
   OMP_PARALLEL_FOR
   for(size_t i = 0; i < cloud.size(); ++i) {
     pcl::PointXYZ point = cloud[i];
@@ -570,12 +531,12 @@ void TransformPointCloudQuat(
 
 // Transforms all points in a pcl point cloud (array input)
 void VectorTranslatePointCloud(
-    pcl::PointCloud<pcl::PointXYZ>& cloud,
-    double magnitude,
-    Eigen::Matrix<double, 3, 1> vector) {
+    pcl::PointCloud<pcl::PointXYZ>* cloud,
+    const double& magnitude,
+    const Eigen::Matrix<double, 3, 1>& vector) {
     OMP_PARALLEL_FOR
-    for(size_t i = 0; i < cloud.size(); ++i) {
-        pcl::PointXYZ point = cloud[i];
+    for(size_t i = 0; i < cloud->size(); ++i) {
+        pcl::PointXYZ point = (*cloud)[i];
 
         Eigen::Matrix<double,3,1> point_matrix;
         Eigen::Matrix<double,3,1> transformed_point_matrix;
@@ -584,18 +545,18 @@ void VectorTranslatePointCloud(
         point.x = transformed_point_matrix[0];
         point.y = transformed_point_matrix[1];
         point.z = transformed_point_matrix[2];
-        cloud[i] = point;
+        (*cloud)[i] = point;
     }
 }
 
 // Transforms all points in a pcl point cloud (array input)
 void TransformPointCloudInv(
-    pcl::PointCloud<pcl::PointXYZ>& cloud,
+    pcl::PointCloud<pcl::PointXYZ>* cloud,
     double transform[6]) {
 
   OMP_PARALLEL_FOR
-  for(size_t i = 0; i < cloud.size(); ++i) {
-    pcl::PointXYZ point = cloud[i];
+  for(size_t i = 0; i < cloud->size(); ++i) {
+    pcl::PointXYZ point = (*cloud)[i];
 
     Eigen::Matrix<double,3,1> point_matrix;
     Eigen::Matrix<double,3,1> transformed_point_matrix;
@@ -604,13 +565,13 @@ void TransformPointCloudInv(
     point.x = transformed_point_matrix[0];
     point.y = transformed_point_matrix[1];
     point.z = transformed_point_matrix[2];
-    cloud[i] = point;
+    (*cloud)[i] = point;
   }
 }
 
 // Transforms all points in a pcl point cloud (vector input)
 void TransformPointCloud(
-    pcl::PointCloud<pcl::PointXYZ>& cloud,
+    pcl::PointCloud<pcl::PointXYZ>* cloud,
     const vector<double>& transform) {
 
   double transform_array[6];
@@ -792,14 +753,14 @@ struct TransformRegularizationError {
 };
 
 void PlaneCorrections(
-    pcl::PointCloud<pcl::PointXYZ> cloud_1,
-    pcl::PointCloud<pcl::PointXYZ> cloud_2,
-    vector<Eigen::Vector3d> k1_centroids,
-    vector<Eigen::Vector3d> k2_centroids,
-    vector<Eigen::Vector4d> normal_equations,
-    vector<Eigen::Vector4d> k2_normal_equations,
-    vector<ros::Publisher> publishers,
-    double* transform) {
+                      const pcl::PointCloud<pcl::PointXYZ>& cloud_1,
+                      const pcl::PointCloud<pcl::PointXYZ>& cloud_2,
+                      const vector<Eigen::Vector3d>& k1_centroids,
+                      const vector<Eigen::Vector3d>& k2_centroids,
+                      const vector<Eigen::Vector4d>& normal_equations,
+                      const vector<Eigen::Vector4d>& k2_normal_equations,
+                      const vector<ros::Publisher>& publishers,
+                      double* transform) {
 
     // Tolerance for RMSE.
     static const double kToleranceError = 0.00001;
@@ -828,7 +789,7 @@ void PlaneCorrections(
         pcl::PointCloud<pcl::PointXYZ> transformed_cloud = cloud_2;
 
         // Shifts cloud by calculated transform
-        TransformPointCloud(transformed_cloud, transform);
+        TransformPointCloud(&transformed_cloud, transform);
         PublishCloud(cloud_1, publishers[0]);
         PublishCloud(transformed_cloud, publishers[1]);
         sleep(3);
@@ -928,7 +889,7 @@ void PlaneCorrections(
     }
 }
 
-double PointDistance(pcl::PointXYZ point1, pcl::PointXYZ point2) {
+double PointDistance(const pcl::PointXYZ point1, const pcl::PointXYZ point2) {
     double distance = 0;
     double x1 = point1.x;
     double y1 = point1.y;
@@ -943,7 +904,8 @@ double PointDistance(pcl::PointXYZ point1, pcl::PointXYZ point2) {
     return distance;
 }
 
-double PointDistance(Eigen::Vector3d point1, Eigen::Vector3d point2) {
+double PointDistance(const Eigen::Vector3d point1,
+                     const Eigen::Vector3d point2) {
   double distance = 0;
   double x1 = point1[0];
   double y1 = point1[1];
@@ -958,7 +920,8 @@ double PointDistance(Eigen::Vector3d point1, Eigen::Vector3d point2) {
   return distance;
 }
 
-double PointDistance(Eigen::Vector3f point1, Eigen::Vector3f point2) {
+double PointDistance(const Eigen::Vector3f point1, 
+                     const Eigen::Vector3f point2) {
   double distance = 0;
   double x1 = point1[0];
   double y1 = point1[1];
@@ -974,14 +937,14 @@ double PointDistance(Eigen::Vector3f point1, Eigen::Vector3f point2) {
 }
 
 void BuildProblem(
-    const pcl::PointCloud<pcl::PointXYZ>& k_cloud,
-    const pcl::PointCloud<pcl::PointXYZ>& l_cloud,
-    const vector<int>& nearest_neighbors,
-    const vector<int>& start_points,
-    double l_pose[6],
-    const pcl::PointCloud<pcl::Normal>& normals,
-    const pcl::PointCloud<pcl::Normal>& normals_l,
-    ceres::Problem* problem) {
+                  const pcl::PointCloud<pcl::PointXYZ>& k_cloud,
+                  const pcl::PointCloud<pcl::PointXYZ>& l_cloud,
+                  const vector<int>& nearest_neighbors,
+                  const vector<int>& start_points,
+                  double l_pose[6],
+                  const pcl::PointCloud<pcl::Normal>& normals,
+                  const pcl::PointCloud<pcl::Normal>& normals_l,
+                  ceres::Problem* problem) {
   // Ceres-Solver Problem setup
   for (size_t i = 0; i < start_points.size(); i++) {
     pcl::PointXYZ l_point, k_point;
@@ -1019,12 +982,13 @@ void BuildProblem(
     }
   }
 }
+
 double ResidualDist(
-    const pcl::PointCloud<pcl::PointXYZ>& k_cloud,
-    const pcl::PointCloud<pcl::PointXYZ>& l_cloud,
-    const pcl::PointCloud<pcl::Normal>& k_normal,
-    const pcl::PointCloud<pcl::Normal>& l_normal,
-    double* pose) {
+                    const pcl::PointCloud<pcl::PointXYZ>& k_cloud,
+                    const pcl::PointCloud<pcl::PointXYZ>& l_cloud,
+                    const pcl::PointCloud<pcl::Normal>& k_normal,
+                    const pcl::PointCloud<pcl::Normal>& l_normal,
+                    double* pose) {
 
   // Create a new problem
   ceres::Problem problem;
@@ -1181,7 +1145,8 @@ double* CombineTransform(double* pose1, double* pose2) {
   return posek;
 }
 
-void VisualizeDepthImage(const pcl::PointCloud<pcl::PointXYZ>& cloud, const ros::Publisher& depth_pub) {
+void VisualizeDepthImage(const pcl::PointCloud<pcl::PointXYZ>& cloud, 
+                         const ros::Publisher& depth_pub) {
   int width = 640;
   int height = 480;
 //   double a = 3.008;
@@ -1222,11 +1187,11 @@ void VisualizeDepthImage(const pcl::PointCloud<pcl::PointXYZ>& cloud, const ros:
 }
 
 void VisualizeNN(
-    const pcl::PointCloud<pcl::PointXYZ>& base_cloud,
-    const pcl::PointCloud<pcl::PointXYZ>& k1_cloud,
-    const vector<int>& nearest_neighbors,
-    const vector<int>& start_points,
-    const ros::Publisher& marker_pub) {
+                  const pcl::PointCloud<pcl::PointXYZ>& base_cloud,
+                  const pcl::PointCloud<pcl::PointXYZ>& k1_cloud,
+                  const vector<int>& nearest_neighbors,
+                  const vector<int>& start_points,
+                  const ros::Publisher& marker_pub) {
 
   visualization_msgs::Marker line_list;
   std_msgs::Header header;
@@ -1281,9 +1246,9 @@ void VisualizeNN(
 }
 
 void VisualizeReferenceFrame(
-    const double* transform,
-    const ros::Publisher& marker_pub,
-    const int id) {
+                            const double* transform,
+                            const ros::Publisher& marker_pub,
+                            const int id) {
 
   visualization_msgs::MarkerArray marker_array = visualization_msgs::MarkerArray();
   visualization_msgs::Marker x_arrow, y_arrow, z_arrow;
@@ -1326,10 +1291,10 @@ void VisualizeReferenceFrame(
 }
 
 void VisualizePoses(
-    const vector<double*>& poses,
-    const vector<double*>& poses2,
-    const vector<int>& keys,
-    const ros::Publisher& marker_pub) {
+                    const vector<double*>& poses,
+                    const vector<double*>& poses2,
+                    const vector<int>& keys,
+                    const ros::Publisher& marker_pub) {
 
   visualization_msgs::MarkerArray markers;
 
@@ -1514,10 +1479,10 @@ Eigen::MatrixXd CalculateCovariance(const Eigen::MatrixXd& mat) {
 }
 
 void VisualizeCovariance(
-    const int num,
-    const string covarianceFolder,
-    const string bagfile,
-    const ceres::CRSMatrix& jacobian) {
+                        const int num,
+                        const string covarianceFolder,
+                        const string bagfile,
+                        const ceres::CRSMatrix& jacobian) {
   //cout << "vizualizing covariance" << endl;
   std::stringstream out;
 
@@ -1571,7 +1536,8 @@ void VisualizeCovariance(
   file.close();
 }
 
-pcl::PointCloud<pcl::PointXYZ> VoxelFilter(pcl::PointCloud<pcl::PointXYZ> cloud) {
+pcl::PointCloud<pcl::PointXYZ> VoxelFilter(
+    const pcl::PointCloud<pcl::PointXYZ>& cloud) {
   pcl::PCLPointCloud2::Ptr cloud_filtered (new pcl::PCLPointCloud2 ());
   pcl::PCLPointCloud2::Ptr ptr_cloud (new pcl::PCLPointCloud2 ());
   pcl::toPCLPointCloud2(cloud, *ptr_cloud);
@@ -1617,23 +1583,23 @@ pcl::PointCloud<pcl::Normal> GetNormals(
 }
 
 void ConstructICP_problem(
-    const vector<ros::Publisher>& publishers,
-    const pcl::PointCloud<pcl::PointXYZ>& cloud_1,
-    const pcl::PointCloud<pcl::PointXYZ>& cloud_2,
-    const pcl::PointCloud<pcl::Normal>& normal_1,
-    const pcl::PointCloud<pcl::Normal>& normal_2,
-    const vector<Eigen::Vector2d>& image_coords_1,
-    const vector<Eigen::Vector2d>& image_coords_2,
-    const double nn_dist,
-    double* transform,
-    ceres::Problem* problem) {
+                          const vector<ros::Publisher>& publishers,
+                          const pcl::PointCloud<pcl::PointXYZ>& cloud_1,
+                          const pcl::PointCloud<pcl::PointXYZ>& cloud_2,
+                          const pcl::PointCloud<pcl::Normal>& normal_1,
+                          const pcl::PointCloud<pcl::Normal>& normal_2,
+                          const vector<Eigen::Vector2d>& image_coords_1,
+                          const vector<Eigen::Vector2d>& image_coords_2,
+                          const double nn_dist,
+                          double* transform,
+                          ceres::Problem* problem) {
   // FunctionTimer timer(__FUNCTION__);
   static const bool kUseNumericOverAutoDiff = false;
   //----------  Transform based on calculated transformation  ----------
   pcl::PointCloud<pcl::PointXYZ> transformed_cloud = cloud_2;
 
   // Shifts cloud by calculated transform
-  TransformPointCloud(transformed_cloud, transform);/*
+  TransformPointCloud(&transformed_cloud, transform);/*
   PublishCloud(cloud_1, publishers[0]);
   PublishCloud(transformed_cloud, publishers[1]);*/
   //PublishCloud(cloud_2, cloud_pub_3);
@@ -1713,13 +1679,13 @@ void ConstructICP_problem(
 }
 
 bool GetKnownCor(
-    const pcl::PointCloud<pcl::PointXYZ>& cloud,
-    const pcl::PointCloud<pcl::Normal>& normal_1,
-    const int k2,
-    const vector<int>& index,
-    pcl::Normal* normal_k1,
-    pcl::PointXYZ* base_point,
-    int& num) {
+                  const pcl::PointCloud<pcl::PointXYZ>& cloud,
+                  const pcl::PointCloud<pcl::Normal>& normal_1,
+                  const int k2,
+                  const vector<int>& index,
+                  pcl::Normal* normal_k1,
+                  pcl::PointXYZ* base_point,
+                  int& num) {
   bool found = false;
   for(size_t i = 0; i < cloud.size(); i++) {
 
@@ -1735,21 +1701,21 @@ bool GetKnownCor(
 }
 
 void ConstructICPKnown(
-    const vector<ros::Publisher>& publishers,
-    const pcl::PointCloud<pcl::PointXYZ>& cloud_1,
-    const pcl::PointCloud<pcl::PointXYZ>& cloud_2,
-    const pcl::PointCloud<pcl::Normal>& normal_1,
-    const pcl::PointCloud<pcl::Normal>& normal_2,
-    const vector<int> index_k1,
-    const vector<int> index_k2,
-    double* transform,
-    ceres::Problem* problem) {
+                      const vector<ros::Publisher>& publishers,
+                      const pcl::PointCloud<pcl::PointXYZ>& cloud_1,
+                      const pcl::PointCloud<pcl::PointXYZ>& cloud_2,
+                      const pcl::PointCloud<pcl::Normal>& normal_1,
+                      const pcl::PointCloud<pcl::Normal>& normal_2,
+                      const vector<int> index_k1,
+                      const vector<int> index_k2,
+                      double* transform,
+                      ceres::Problem* problem) {
   static const bool kUseNumericOverAutoDiff = false;
   //----------  Transform based on calculated transformation  ----------
   pcl::PointCloud<pcl::PointXYZ> transformed_cloud = cloud_2;
 
   // Shifts cloud by calculated transform
-  TransformPointCloud(transformed_cloud, transform);
+  TransformPointCloud(&transformed_cloud, transform);
   PublishCloud(cloud_1, publishers[0]);
   PublishCloud(transformed_cloud, publishers[1]);
   //PublishCloud(cloud_2, cloud_pub_3);
@@ -1805,19 +1771,19 @@ void ConstructICPKnown(
 }
 
 void ICP(
-    const int k,
-    const double nn_dist,
-    const vector<ros::Publisher>& publishers,
-    const string& covarianceFolder,
-    const string& bagFile,
-    const pcl::PointCloud<pcl::PointXYZ>& cloud_1,
-    const pcl::PointCloud<pcl::PointXYZ>& cloud_2,
-    const pcl::PointCloud<pcl::Normal>& normal_1,
-    const pcl::PointCloud<pcl::Normal>& normal_2,
-    const vector<Eigen::Vector2d>& image_coords_1,
-    const vector<Eigen::Vector2d>& image_coords_2,
-    double* transform,
-    double* final_rmse) {
+        const int k,
+        const double nn_dist,
+        const vector<ros::Publisher>& publishers,
+        const string& covarianceFolder,
+        const string& bagFile,
+        const pcl::PointCloud<pcl::PointXYZ>& cloud_1,
+        const pcl::PointCloud<pcl::PointXYZ>& cloud_2,
+        const pcl::PointCloud<pcl::Normal>& normal_1,
+        const pcl::PointCloud<pcl::Normal>& normal_2,
+        const vector<Eigen::Vector2d>& image_coords_1,
+        const vector<Eigen::Vector2d>& image_coords_2,
+        double* transform,
+        double* final_rmse) {
 
   FunctionTimer timer(__FUNCTION__);
   first_nn = true;
@@ -1877,7 +1843,7 @@ void ICP(
     pcl::PointCloud<pcl::PointXYZ> transformed_cloud = cloud_2;
 
     // Shifts cloud by calculated transform
-    TransformPointCloud(transformed_cloud, transform);
+    TransformPointCloud(&transformed_cloud, transform);
     PublishCloud(cloud_1, publishers[0]);
     PublishCloud(transformed_cloud, publishers[1]);
 //     fprintf(stdout, "clouds published\n");
@@ -1902,18 +1868,18 @@ void ICP(
 }
 
 double* ICPKnownC(
-    const int k,
-    const vector<ros::Publisher>& publishers,
-    const string& covarianceFolder,
-    const string& bagFile,
-    const pcl::PointCloud<pcl::PointXYZ>& cloud_1,
-    const pcl::PointCloud<pcl::PointXYZ>& cloud_2,
-    const pcl::PointCloud<pcl::Normal>& normal_1,
-    const pcl::PointCloud<pcl::Normal>& normal_2,
-    const vector<int> index_k1,
-    const vector<int> index_k2,
-    double* transform,
-    double* final_mean) {
+                  const int k,
+                  const vector<ros::Publisher>& publishers,
+                  const string& covarianceFolder,
+                  const string& bagFile,
+                  const pcl::PointCloud<pcl::PointXYZ>& cloud_1,
+                  const pcl::PointCloud<pcl::PointXYZ>& cloud_2,
+                  const pcl::PointCloud<pcl::Normal>& normal_1,
+                  const pcl::PointCloud<pcl::Normal>& normal_2,
+                  const vector<int> index_k1,
+                  const vector<int> index_k2,
+                  double* transform,
+                  double* final_mean) {
   // Tolerance for RMSE.
   static const double kToleranceError = 0.0001;
   // The maximum number of overall iterations.
@@ -1966,136 +1932,6 @@ double* ICPKnownC(
 
   return transform;
 }
-
-
-// double* ClosedForm(
-//     const pcl::PointCloud<pcl::PointXYZ>& cloud_1,
-//     const pcl::PointCloud<pcl::PointXYZ>& cloud_2,
-//     double* transform){
-//
-//   // Transform second cloud
-//   //----------  Transform based on calculated transformation  ----------
-//   pcl::PointCloud<pcl::PointXYZ> transformed_cloud = cloud_2;
-//
-//   // Find NN
-//   vector<int > nearest_neigbors;
-//   vector<int > start_points;
-//   // mean += KdTreeNN_normal(base_cloud, transformed_cloud, normals[k], normals[l],
-//   // nearest_neigbors, start_points);
-//   // Reverse order nearest neighbor to make sure we're transforming in the right direction
-//   //cout << "Finding Neighbors" << endl;
-//   /*KdTreeNN*/(cloud_1, transformed_cloud,
-//   nearest_neigbors, start_points);
-//   // Shifts cloud by calculated transform
-//   TransformPointCloud(transformed_cloud, transform);
-//   // Get centroid of both clouds
-//   Eigen::Vector3d centroid1;
-//   centroid1 << 0, 0, 0;
-//   Eigen::Vector3d centroid2;
-//   centroid2 << 0, 0, 0;
-//   for (size_t i = 0; i < nearest_neigbors.size(); i++){
-//     centroid1[0] =  cloud_1[nearest_neigbors[i]].x;
-//     centroid1[1] =  cloud_1[nearest_neigbors[i]].y;
-//     centroid1[2] =  cloud_1[nearest_neigbors[i]].z;
-//   }
-//   centroid1[0] = centroid1[0] / cloud_1.size();
-//   centroid1[1] = centroid1[1] / cloud_1.size();
-//   centroid1[2] = centroid1[2] / cloud_1.size();
-//   for (size_t i = 0; i < start_points.size(); i++){
-//     centroid2[0] = cloud_2[start_points[i]].x;
-//     centroid2[1] = cloud_2[start_points[i]].y;
-//     centroid2[2] = cloud_2[start_points[i]].z;
-//   }
-//   centroid2[0] = centroid2[0] / cloud_2.size();
-//   centroid2[1] = centroid2[1] / cloud_2.size();
-//   centroid2[2] = centroid2[2] / cloud_2.size();
-//   //Build the H matrix
-//   Eigen::Matrix3d H;
-//   for (size_t i = 0; i < start_points.size(); i++) {
-//      pcl::PointXYZ cloud2_point, cloud1_point;
-//     // Use the original cloud, not the transformed cloud
-//     cloud2_point = cloud_2[start_points[i]];
-//     // Base cloud is unchanged
-//     cloud1_point = cloud_1[nearest_neigbors[i]];
-//
-//     Eigen::Vector3d temp_point1, temp_point2;
-//
-//     temp_point1[0] = (cloud1_point.x - centroid1[0]);
-//     temp_point1[1] = (cloud1_point.y - centroid1[1]);
-//     temp_point1[2] = (cloud1_point.z - centroid1[2]);
-//
-//     temp_point2[0] = (cloud2_point.x - centroid2[0]);
-//     temp_point2[1] = (cloud2_point.y - centroid2[1]);
-//     temp_point2[2] = (cloud2_point.z - centroid2[2]);
-//
-//     H += temp_point2 * temp_point1.transpose();
-//   }
-//   // Use SVD to solve the H matrix
-//   Eigen::JacobiSVD<Eigen::MatrixXd> svd(H, Eigen::ComputeThinU | Eigen::ComputeThinV);
-//   // R = VU^T
-//   Eigen::Matrix3d R;
-//   R = svd.matrixV() * svd.matrixU().transpose();
-//
-//   // T = -R x centroidB + CentroidA
-//   Eigen::Vector3d T = -R * centroid2 + centroid1;
-//
-//   Eigen::Matrix<double,3,1> axis(transform[0], transform[1], transform[2]);
-//   const double angle = axis.norm();
-//   if(angle != 0) {
-//     axis = axis / angle;
-//   }
-//   Eigen::Transform<double, 3, Eigen::Affine> rotation =
-//   Eigen::Transform<double, 3, Eigen::Affine>(Eigen::AngleAxis<double>(
-//     angle, axis));
-//
-//   Eigen::Translation<double, 3> translation =
-//   Eigen::Translation<double, 3>(transform[3], transform[4], transform[5]);
-//
-//   Eigen::Transform<double, 3, Eigen::Affine> affine_transform =
-//       translation * rotation;
-//
-//   Eigen::Transform<double, 3, Eigen::Affine> rotation_calc;
-//
-//   Eigen::Quaterniond quat;
-//   quat = R;
-//   rotation_calc = quat;
-//   affine_transform = rotation_calc * affine_transform;
-//
-//     // Find the rotation component
-//   // Find the angle axis format
-//   Eigen::AngleAxis<double> angle_axis(affine_transform.rotation());
-//
-//   // Get the axis
-//   Eigen::Vector3d normal_axis = angle_axis.axis();
-//
-//   // Recompute the rotation angle
-//   double combined_angle = angle_axis.angle();
-//   Eigen::Vector3d combined_axis = normal_axis * combined_angle;
-//
-//   // Recompute the rotation matrix
-//   Eigen::Transform<double, 3, Eigen::Affine> combined_rotation =
-//       Eigen::Transform<double, 3, Eigen::Affine>(
-//           Eigen::AngleAxis<double>(combined_angle, normal_axis));
-//
-//   // Compute Translation
-//   Eigen::Translation<double, 3> combined_translation(
-//       affine_transform.translation());
-//   cout << "Closed Form Effects" << endl;
-//   //PrintPose(transform);
-//   // Assign values to pose
-//   transform[3] = (combined_rotation.inverse() *
-//       combined_translation).translation().x();
-//   transform[4] = (combined_rotation.inverse() *
-//       combined_translation).translation().y();
-//   transform[5] = (combined_rotation.inverse() *
-//       combined_translation).translation().z();
-//
-//   transform[0] = combined_axis(0) + T[0];
-//   transform[1] = combined_axis(1) + T[1];
-//   transform[2] = combined_axis(2) + T[2];
-// //  PrintPose(transform);
-//   return transform;
-// }
 
 pcl::PointCloud<pcl::PointXYZ> CloudFromVector(
     const vector<Eigen::Vector3f>& pointCloud, const vector<int>& pixelLocs) {
@@ -2154,10 +1990,10 @@ rosbag::View::iterator GetCloudsSlamBag(rosbag::View::iterator it,
 
 // Reads clouds from a given iterator, saves to buffer if they are over
 rosbag::View::iterator GetClouds(rosbag::View::iterator it,
-   std::deque<pcl::PointCloud<pcl::PointXYZ> >* buffer1,
-   std::deque<pcl::PointCloud<pcl::PointXYZ> >* buffer2,
-   std::deque<double>* timestamps_1,
-   std::deque<double>* timestamps_2) {
+                          std::deque<pcl::PointCloud<pcl::PointXYZ> >* buffer1,
+                          std::deque<pcl::PointCloud<pcl::PointXYZ> >* buffer2,
+                          std::deque<double>* timestamps_1,
+                          std::deque<double>* timestamps_2) {
 
   PlaneFilter filter;
   KinectRawDepthCam camera = KinectRawDepthCam();
@@ -2228,15 +2064,15 @@ rosbag::View::iterator GetCloudsOne(rosbag::View::iterator it,
 }
 
 rosbag::View::iterator GetCloudsBag(rosbag::View::iterator it,
-   rosbag::View::iterator end,
-   std::deque<pcl::PointCloud<pcl::PointXYZ> >* buffer1,
-   std::deque<pcl::PointCloud<pcl::PointXYZ> >* buffer2,
-   std::deque<double>* timestamps_1,
-   std::deque<double>* timestamps_2,
-   pcl::PointCloud<pcl::PointXYZ>* cloud1,
-   pcl::PointCloud<pcl::PointXYZ>* cloud2,
-   double* time1,
-   double* time2) {
+    rosbag::View::iterator end,
+    std::deque<pcl::PointCloud<pcl::PointXYZ> >* buffer1,
+    std::deque<pcl::PointCloud<pcl::PointXYZ> >* buffer2,
+    std::deque<double>* timestamps_1,
+    std::deque<double>* timestamps_2,
+    pcl::PointCloud<pcl::PointXYZ>* cloud1,
+    pcl::PointCloud<pcl::PointXYZ>* cloud2,
+    double* time1,
+    double* time2) {
 
   for(uint i = 0; i < 2; i++) {
 //     cout << "instantiate" << endl;

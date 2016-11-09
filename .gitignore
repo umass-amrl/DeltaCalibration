@@ -4,3 +4,6 @@ lib/
 kinectStick_close.bag
 kinectStick_close.txt
 kinect_overlap_1.bag
+.kdev4/
+delta_calibration.kdev4
+src/shared/.svn/

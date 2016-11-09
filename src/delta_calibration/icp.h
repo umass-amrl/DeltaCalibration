@@ -114,26 +114,26 @@ double KdTreeNN(
     vector<int>& nearest_neigbors, vector<int>& start_points);
 
 void TransformPointCloudInv(
-    pcl::PointCloud<pcl::PointXYZ>& cloud, 
+    pcl::PointCloud<pcl::PointXYZ>* cloud, 
     double transform[6]);
 
 void TransformPointCloud(
-    pcl::PointCloud<pcl::PointXYZ>& cloud,
+    pcl::PointCloud<pcl::PointXYZ>* cloud,
     double transform[6]);
 
 void TransformPointCloudQuat(
-  pcl::PointCloud<pcl::PointXYZ>& cloud,
+  pcl::PointCloud<pcl::PointXYZ>* cloud,
   double transform[7]);
 
 void TransformPointCloud(
-    pcl::PointCloud<pcl::PointXYZ>& cloud,
+    pcl::PointCloud<pcl::PointXYZ>* cloud,
     const vector<double>& transform);
 
 pcl::PointCloud<pcl::PointXYZ> CloudFromVector(
   const vector<Eigen::Vector3f>& pointCloud, const vector<int>& pixelLocs);
 
 void VectorTranslatePointCloud(
-  pcl::PointCloud<pcl::PointXYZ>& cloud,
+  pcl::PointCloud<pcl::PointXYZ>* cloud,
   double magnitude,
   Eigen::Matrix<double, 3, 1> vector);
 
@@ -212,7 +212,9 @@ void VisualizeCovariance(
     const string bagfile,
     const ceres::CRSMatrix& jacobian);
 
-pcl::PointCloud<pcl::PointXYZ> VoxelFilter(pcl::PointCloud<pcl::PointXYZ> cloud);
+pcl::PointCloud<pcl::PointXYZ> VoxelFilter(
+  const pcl::PointCloud<pcl::PointXYZ>&                                       
+      cloud);
 
 pcl::PointCloud<pcl::Normal> GetNormals(
     const pcl::PointCloud<pcl::PointXYZ>& cloud);

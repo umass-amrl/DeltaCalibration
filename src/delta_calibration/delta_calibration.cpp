@@ -18,6 +18,7 @@ ros::Publisher cloud_pub_4;
 ros::Publisher marker_pub;
 ros::Publisher markerArray_pub;
 bool normal_file = false;
+
 // Signal handler for breaks (Ctrl-C)
 void HandleStop(int i) {
   printf("\nTerminating.\n");
@@ -639,8 +640,8 @@ void DeltaCalculationSlamBag(string bag_name,
     pcl::PointCloud<pcl::PointXYZ> temp_cloud2 = k2_cloud;
     WriteToBag("kinect_1", &keyframe_bag, k1_cloud);
     WriteToBag("kinect_2", &keyframe_bag, k2_cloud);
-    TransformPointCloud(temp_cloud1, variables->k1_combined_transform);
-    TransformPointCloud(temp_cloud2, variables->k2_combined_transform);
+    TransformPointCloud(&temp_cloud1, variables->k1_combined_transform);
+    TransformPointCloud(&temp_cloud2, variables->k2_combined_transform);
     // Zero Combined transforms
     std::copy(pose0.begin(), pose0.end(), variables->k1_combined_transform);
     std::copy(pose0.begin(), pose0.end()  , variables->k2_combined_transform);
@@ -868,8 +869,8 @@ void DeltaCalculation(string bag_name,
       pcl::PointCloud<pcl::PointXYZ> temp_cloud2 = k2_cloud;
       WriteToBag("kinect_1", &keyframe_bag, k1_cloud);
       WriteToBag("kinect_2", &keyframe_bag, k2_cloud);
-      TransformPointCloud(temp_cloud1, variables->k1_combined_transform);
-      TransformPointCloud(temp_cloud2, variables->k2_combined_transform);
+      TransformPointCloud(&temp_cloud1, variables->k1_combined_transform);
+      TransformPointCloud(&temp_cloud2, variables->k2_combined_transform);
       // Zero Combined transforms
       std::copy(pose0.begin(), pose0.end(), variables->k1_combined_transform);
       std::copy(pose0.begin(), pose0.end()  , variables->k2_combined_transform);
@@ -1025,7 +1026,7 @@ void DeltaCalculationOne(string bag_name,
     //Transform the clouds and then write them to object files
     pcl::PointCloud<pcl::PointXYZ> temp_cloud1 = k1_cloud;
     WriteToBag("kinect_1", &keyframe_bag, k1_cloud);
-    TransformPointCloud(temp_cloud1, variables->k1_combined_transform);
+    TransformPointCloud(&temp_cloud1, variables->k1_combined_transform);
     // Zero Combined transforms
     std::copy(pose0.begin(), pose0.end(), variables->k1_combined_transform);
     WriteToObj(variables->object_file, variables->k1_output_name, count, temp_cloud1);
@@ -1292,7 +1293,7 @@ void DeltaCalculationOdometry(string bag_name,
     //Transform the clouds and then write them to object files
     pcl::PointCloud<pcl::PointXYZ> temp_cloud1 = k1_cloud;
     WriteToBag("kinect_1", &keyframe_bag, k1_cloud);
-    TransformPointCloud(temp_cloud1, variables->k1_combined_transform);
+    TransformPointCloud(&temp_cloud1, variables->k1_combined_transform);
     // Zero Combined transforms
     std::copy(pose0.begin(), pose0.end(), variables->k1_combined_transform);
     WriteToObj(variables->object_file, variables->k1_output_name, count, temp_cloud1);
