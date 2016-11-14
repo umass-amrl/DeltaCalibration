@@ -349,10 +349,6 @@ void CheckTransform(const string& bagfile, const string& transform_file) {
     transform[0] = axis[0] * (angle / transform_division);
     transform[1] = axis[1] * (angle / transform_division);
     transform[2] = axis[2] * (angle / transform_division);
-    // double  rotation[] = {1.74, 0, 0, 0, 0, 0};
-    //     TransformPointCloud_PCL(cloud_k1, rotation);
-    //     TransformPointCloud_PCL(cloud_k2, rotation);
-    // in a loop apply partial transform n times
     for(int i = 0; i < transform_division; i++) {
       TransformPointCloud_PCL(transformed_cloud, transform);
       //       TransformPointCloud_PCL(transformed_cloud, rotation);
@@ -375,28 +371,6 @@ void CheckTransform(const string& bagfile, const string& transform_file) {
       line_list.points.clear();
     }
     pcl::PointCloud<pcl::PointXYZ> combo_cloud = cloud_k1;
-//     Eigen::Vector3d rotation_correction, translation_correction;
-//     vector<pcl::PointCloud<pcl::PointXYZ> > transformed_planes = getPlanes(transformed_cloud, &normal_equations_trans);
-//     ComparePlanes(k1_planes, transformed_planes, normal_equations, normal_equations_trans, rotation_correction, translation_correction);
-//     transform[0] = rotation_correction[0];
-//     transform[1] = rotation_correction[1];
-//     transform[2] = rotation_correction[2];
-//     transform[3] = 0;
-//     transform[4] = 0;
-//     transform[5] = 0;
-
-//     TransformPointCloud_PCL(transformed_cloud, rotation);
-
-
-//     publish_cloud(transformed_cloud, cloud_pub_3);
-//     publish_cloud(cloud_k1, cloud_pub);
-// //     TransformPointCloudInv(transformed_cloud, rotation);
-//     TransformPointCloud_PCL(transformed_cloud, transform);
-// //     TransformPointCloud_PCL(transformed_cloud, rotation);
-//     sleep(3);
-//     publish_cloud(transformed_cloud, cloud_pub_3);
-//     publish_cloud(cloud_k1, cloud_pub);
-    //writeToObj(out_name, count, combo_cloud);
   }
 }
 
@@ -404,7 +378,6 @@ int main(int argc, char **argv) {
   signal(SIGINT,HandleStop);
   signal(SIGALRM,HandleStop);
 
-  int kMaxClouds = 10;
   char* bagFile = (char*)"pair_upright.bag";
   char* transform_file = (char*)"";
   // Parse arguments.
