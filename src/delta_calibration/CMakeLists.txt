@@ -68,15 +68,17 @@ TARGET_LINK_LIBRARIES(${target}
     fspf_library
     ${OpenCV_LIBRARIES} ${libs})
     
-# SET(target check_transform)
-# ROSBUILD_ADD_EXECUTABLE(${target} CheckTransform.cpp)
-# ADD_DEPENDENCIES(${target}
-#     ceres
-#     shared_libraries
-#     fspf_library
-#     ${OpenCV_LIBRARIES})
-# TARGET_LINK_LIBRARIES(${target}
-#     ceres
-#     shared_libraries 
-#     fspf_library
-#     ${OpenCV_LIBRARIES} ${libs})
+SET(target check_transform)
+ROSBUILD_ADD_EXECUTABLE(${target} check_transform.cpp
+                                  icp.cpp
+                                  ../perception_tools/kdtree.cpp)
+ADD_DEPENDENCIES(${target}
+    ceres
+    shared_libraries
+    fspf_library
+    ${OpenCV_LIBRARIES})
+TARGET_LINK_LIBRARIES(${target}
+    ceres
+    shared_libraries 
+    fspf_library
+    ${OpenCV_LIBRARIES} ${libs})

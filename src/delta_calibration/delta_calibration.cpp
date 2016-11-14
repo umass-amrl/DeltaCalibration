@@ -17,6 +17,7 @@ ros::Publisher cloud_pub_4;
 
 ros::Publisher marker_pub;
 ros::Publisher markerArray_pub;
+// Controls usage of normal files
 bool normal_file = false;
 
 // Signal handler for breaks (Ctrl-C)
@@ -33,11 +34,12 @@ void PrintPose(double* pose){
 }
 
 template<typename T>
-void pop_front(std::vector<T>& vec)
+void PopFront(std::vector<T>* vec)
 {
   assert(!vec.empty());
   vec.erase(vec.begin());
 }
+
 void SavePoses(const vector<double*>& poses, string& filename) {
   filename += ".poses";
   ofstream myfile (filename.c_str());
@@ -65,26 +67,10 @@ void WritePose(double* pose, ofstream file) {
   }
 }
 
-// void WriteToObj(const string folder, const string bagfile,
-//     const int num,
-//     const pcl::PointCloud<pcl::PointXYZ>& cloud) {
-//
-//   std::string frame_string;
-//   std::stringstream out;
-//   string temp = bagfile;
-//   mkdir(folder.c_str(), 0777);
-//   out << num;
-//   string filename = folder + "/" + bagfile + "_" + out.str() + ".obj";
-//   ofstream file(filename.c_str());
-//   for(size_t i = 0; i < cloud.size(); i++) {
-//     pcl::PointXYZ point = cloud[i];
-//     file << "v " << point.x << " " << point.y << " " << point.z << endl;
-//   }
-//   file.close();
-// }
-
-void WritePoseFile(double* pose, const double& timestamp,
-    const int& count, ofstream& file) {
+void WritePoseFile(double* pose, 
+                   const double& timestamp,
+                   const int& count, 
+                   ofstream& file) {
 
   if (file.is_open()) {
     //cout << "Writing to bag_name" << endl;
@@ -98,18 +84,18 @@ void WritePoseFile(double* pose, const double& timestamp,
 }
 
 void CalculateDelta(
-      const int k,
-      const vector<ros::Publisher>& publishers,
-      const string& covarianceFolder,
-      const string& bagFile,
-      const pcl::PointCloud<pcl::PointXYZ>& cloud_1,
-      const pcl::PointCloud<pcl::PointXYZ>& cloud_2,
-      const pcl::PointCloud<pcl::PointXYZ>& cloud_3,
-      const pcl::PointCloud<pcl::Normal>& normal_1,
-      const pcl::PointCloud<pcl::Normal>& normal_2,
-      const pcl::PointCloud<pcl::Normal>& normal_3,
-      double* transform,
-      double* final_rmse) {
+    const int k,
+    const vector<ros::Publisher>& publishers,
+    const string& covarianceFolder,
+    const string& bagFile,
+    const pcl::PointCloud<pcl::PointXYZ>& cloud_1,
+    const pcl::PointCloud<pcl::PointXYZ>& cloud_2,
+    const pcl::PointCloud<pcl::PointXYZ>& cloud_3,
+    const pcl::PointCloud<pcl::Normal>& normal_1,
+    const pcl::PointCloud<pcl::Normal>& normal_2,
+    const pcl::PointCloud<pcl::Normal>& normal_3,
+    double* transform,
+    double* final_rmse) {
 
   // From this point on, calculating the icp between clouds
     double* calculated_delta = new double[6];
@@ -255,12 +241,10 @@ rosbag::View::iterator InitializeVariables(
   input->k2_velocity_list = k2_velocity_list;
   // Read in the first cloud from each kinect, set it as the keyframe
   // and cloud k - 1, set the combined transform to the zero transform
-//   cout << "Getting Initial Clouds" << endl;
   bag_it = TimeAlignedClouds(bag_it, end,
       &input->k1_buffer, &input->k2_buffer, &(input->k1_timestamps), &input->k2_timestamps,
      &input->k1_keyframe, &input->k2_keyframe, &input->k1_timestamp, &input->k2_timestamp);
   // Key normals
-//   cout << "Calculating Normals" << endl;
   input->k1_key_normal = GetNormals(input->k1_keyframe);
   input->k2_key_normal = GetNormals(input->k2_keyframe);
   // Previous clouds
@@ -270,7 +254,6 @@ rosbag::View::iterator InitializeVariables(
   // Previous normals
   input->k1_prev_normal = input->k1_key_normal;
   input->k2_prev_normal = input->k2_key_normal;
-//   cout << "Initializing Arrays" << endl;
   vector<double> pose0(6, 0.0);
   std::copy(pose0.begin(), pose0.end(), input->k1_combined_transform);
   std::copy(pose0.begin(), pose0.end(), input->k2_combined_transform);
@@ -279,12 +262,12 @@ rosbag::View::iterator InitializeVariables(
   //--- End Initialization ---
 }
 
-rosbag::View::iterator InitializeVariablesOne(
-  string bag_name,
-  int degree,
-  rosbag::View::iterator bag_it,
-  rosbag::View::iterator end,
-  DeltaCalVariables* input) {
+rosbag::View::iterator InitializeVariablesSingle(
+    string bag_name,
+    int degree,
+    rosbag::View::iterator bag_it,
+    rosbag::View::iterator end,
+    DeltaCalVariables* input) {
   
   // --- INITIALIZATION ---
   // Degree to string
@@ -317,7 +300,6 @@ rosbag::View::iterator InitializeVariablesOne(
   input->k1_velocity_list = k1_velocity_list;
   // Read in the first cloud from each kinect, set it as the keyframe
   // and cloud k - 1, set the combined transform to the zero transform
-  //   cout << "Getting Initial Clouds" << endl;
   bag_it = OneSensorClouds(bag_it, end, &input->k1_buffer,
                            &(input->k1_timestamps),
                            &input->k1_keyframe, &input->k1_timestamp);
@@ -328,7 +310,6 @@ rosbag::View::iterator InitializeVariablesOne(
   input->k1_prev = input->k1_keyframe;
   // Previous normals
   input->k1_prev_normal = input->k1_key_normal;
-  //   cout << "Initializing Arrays" << endl;
   vector<double> pose0(6, 0.0);
   std::copy(pose0.begin(), pose0.end(), input->k1_combined_transform);
   // Lists used to threshold over velocity
@@ -337,13 +318,13 @@ rosbag::View::iterator InitializeVariablesOne(
   }
 
 rosbag::View::iterator InitializeVariablesSlam(
-  string bag_name,
-  int degree,
-  rosbag::View::iterator bag_it,
-  rosbag::View::iterator end,
-  rosbag::View::iterator& bag_it2,
-  rosbag::View::iterator end2,
-  DeltaCalVariables* input) {
+    string bag_name,
+    int degree,
+    rosbag::View::iterator bag_it,
+    rosbag::View::iterator end,
+    rosbag::View::iterator& bag_it2,
+    rosbag::View::iterator end2,
+    DeltaCalVariables* input) {
   
   // --- INITIALIZATION ---
   // Degree to string
@@ -381,7 +362,6 @@ rosbag::View::iterator InitializeVariablesSlam(
   input->k2_velocity_list = k2_velocity_list;
   // Read in the first cloud from each kinect, set it as the keyframe
   // and cloud k - 1, set the combined transform to the zero transform
-  //   cout << "Getting Initial Clouds" << endl;
   bag_it = TimeAlignedCloudsSlamBag(bag_it, end, &bag_it2, end2,
                                     &input->k1_buffer, &input->k2_buffer, &(input->k1_timestamps), &input->k2_timestamps,
                                     &input->k1_keyframe, &input->k2_keyframe, &input->k1_timestamp, &input->k2_timestamp);
@@ -395,7 +375,6 @@ rosbag::View::iterator InitializeVariablesSlam(
   // Previous normals
   input->k1_prev_normal = input->k1_key_normal;
   input->k2_prev_normal = input->k2_key_normal;
-  //   cout << "Initializing Arrays" << endl;
   vector<double> pose0(6, 0.0);
   std::copy(pose0.begin(), pose0.end(), input->k1_combined_transform);
   std::copy(pose0.begin(), pose0.end(), input->k2_combined_transform);
@@ -404,6 +383,7 @@ rosbag::View::iterator InitializeVariablesSlam(
   //--- End Initialization ---
   }
 
+  // Read Normals from a pcl normal file
 std::vector<pcl::PointCloud<pcl::Normal> > ReadNormals(std::string filename) {
   ifstream fin(filename.c_str(), ios::in | ios::binary);
   vector<pcl::PointCloud<pcl::Normal> > normals;
@@ -420,7 +400,6 @@ std::vector<pcl::PointCloud<pcl::Normal> > ReadNormals(std::string filename) {
   cout << size << endl;
 
   pcl::PointCloud<pcl::Normal> temp[size];
-  //char* temp[size];
   fin.read((char*)&temp, 1 * normals_size);
   for(int i = 0; i < size; i++) {
     normals.push_back(temp[i]);
@@ -430,14 +409,16 @@ std::vector<pcl::PointCloud<pcl::Normal> > ReadNormals(std::string filename) {
   return normals;
 }
 
-void DeltaCalculationSlamBag(string bag_name,
-                      vector<ros::Publisher> publishers,
-                      const int degree,
-                      const int kMaxClouds) {
+// Performs DeltaCalculation given a bagfile containing data recorded from 
+// openni
+void DeltaCalculationSlam(string bag_name,
+                          vector<ros::Publisher> publishers,
+                          const int degree,
+                          const int kMaxClouds) {
   
   // --- INITIALIZATION ---
   DeltaCalVariables* variables = new DeltaCalVariables();
-  //Opening bagfile
+  // Opening bagfile
   string bag_file = bag_name + ".bag";
   string pcd_folder = bag_name + "pcd_file/";
   mkdir(pcd_folder.c_str(), 0777);
@@ -449,18 +430,21 @@ void DeltaCalculationSlamBag(string bag_name,
   keyframe_bag.open(keyframe_bag_name, rosbag::bagmode::Write);
   cout << "Bag open" << endl;
   std::vector<std::string> topics;
+  // Topics to read data from
   topics.push_back(std::string("/kinect_1/depth_registered/image_raw"));
   std::vector<std::string> topics2;
   topics2.push_back(std::string("/kinect_2/depth_registered/image_raw"));
   rosbag::View view(bag, rosbag::TopicQuery(topics));
   rosbag::View view2(bag, rosbag::TopicQuery(topics2));
   
+  // Values used for reading/writing normals to a file
   string str_key_normal_k1 = pcd_folder + "key_normal_k1";
   string str_key_normal_k2 = pcd_folder + "key_normal_k2";
   string str_prev_normal_k1 = pcd_folder + "prev_normal_k1";
   string str_prev_normal_k2 =pcd_folder + "prev_normal_k2";
   string str_normal_k1 = pcd_folder + "normal_k1";
   string str_normal_k2 =pcd_folder + "normal_k2";
+  
   // Iterator over bag bag_name
   rosbag::View::iterator bag_it = view.begin();
   rosbag::View::iterator end = view.end();
@@ -472,11 +456,13 @@ void DeltaCalculationSlamBag(string bag_name,
   int avg_len = 5;
   bool dist_okay = false;
   int count = 0;
+  
   // Write keyframes to object files
   WriteToObj(variables->object_file, variables->k1_output_name, count, variables->k1_keyframe);
   WriteToObj(variables->object_file, variables->k2_output_name, count, variables->k2_keyframe);
   WriteToBag("kinect_1", &keyframe_bag, variables->k1_keyframe);
   WriteToBag("kinect_2", &keyframe_bag, variables->k2_keyframe);
+  
   // Save normals and get size of normals
   all_normals.push_back(variables->k1_key_normal);
   all_normals.push_back(variables->k2_key_normal);
@@ -485,7 +471,7 @@ void DeltaCalculationSlamBag(string bag_name,
   
   vector<pcl::PointCloud<pcl::Normal> > saved_normals;
   if(normal_file) {
-    
+    // No behavior for using normals
   }
   ofstream fout(normal_name.c_str(), ios::out | ios::binary);
   normal_size = sizeof(all_normals[0]);
@@ -506,19 +492,12 @@ void DeltaCalculationSlamBag(string bag_name,
   
   pcl::PointCloud<pcl::Normal> k1_normal;
   pcl::PointCloud<pcl::Normal> k2_normal;
+  
   // Get normals for the two clouds
   if(normal_file) {
     std::stringstream out;
     out << count;
     pcl::PCLPointCloud2 cloud_blob;
-    //       pcl::io::loadPCDFile (str_key_normal_k1 + "_" + out.str() + ".pcd", cloud_blob);
-    //       pcl::fromPCLPointCloud2 (cloud_blob, variables->k1_key_normal);
-    //       pcl::io::loadPCDFile (str_key_normal_k2 + "_" + out.str() + ".pcd", cloud_blob);
-    //       pcl::fromPCLPointCloud2 (cloud_blob, variables->k2_key_normal);
-    //       pcl::io::loadPCDFile (str_prev_normal_k1 + "_" + out.str() + ".pcd", cloud_blob);
-    //       pcl::fromPCLPointCloud2 (cloud_blob, variables->k1_prev_normal);
-    //       pcl::io::loadPCDFile (str_prev_normal_k2 + "_" + out.str() + ".pcd", cloud_blob);
-    //       pcl::fromPCLPointCloud2 (cloud_blob, variables->k2_prev_normal);
     pcl::io::loadPCDFile (str_normal_k1 + "_" + out.str() + ".pcd", cloud_blob);
     pcl::fromPCLPointCloud2 (cloud_blob, k1_normal);
     pcl::io::loadPCDFile (str_normal_k2 + "_" + out.str() + ".pcd", cloud_blob);
@@ -576,17 +555,8 @@ void DeltaCalculationSlamBag(string bag_name,
   double k2_acc_velocity =
   std::accumulate(variables->k2_velocity_list.begin(), variables->k2_velocity_list.end(), 0.0);
   k2_acc_velocity = k2_acc_velocity / avg_len;
-  // cout << "Velocity print" << endl;
-  // *(variables->velocity_file) << count << "\t" << k1_velocity << "\t" << k2_velocity;
-  // cout << "Velocity print 2" << endl;
-  // *variables->velocity_file <<  "\t" << k1_acc_velocity << "\t" << k2_acc_velocity <<"\n";
-  // cout << "Velocity print 3" << endl;
-  // *variables->velocity_file << std::flush;
-  // cout << "Velocity print 4" << endl;
-  // *variables->velocity_file << std::flush;
-  // cout << "residual comparison" << endl;
-  // If our residual is large enough, or we are far enough from keyframe
   
+  // If our residual is large enough, or we are far enough from keyframe
   if ((k1_residual > 0.003 && k2_residual > 0.003) || dist_okay) {
     // Run ICP
     fprintf(stdout, "Kinect 1\n");
@@ -668,15 +638,14 @@ void DeltaCalculationSlamBag(string bag_name,
   variables->k2_prev_normal = k2_normal;
   variables->k1_prev_timestamp = variables->k1_timestamp;
   variables->k2_prev_timestamp = variables->k2_timestamp;
-  //VisualizePoses(trajectory1, trajectory2, keys);
-    }
-    keyframe_bag.close();
-                      }
+  }
+  keyframe_bag.close();
+}
 
 void DeltaCalculation(string bag_name,
-    vector<ros::Publisher> publishers,
-    const int degree,
-    const int kMaxClouds) {
+                      vector<ros::Publisher> publishers,
+                      const int degree,
+                      const int kMaxClouds) {
 
   // --- INITIALIZATION ---
   DeltaCalVariables* variables = new DeltaCalVariables();
@@ -708,15 +677,16 @@ void DeltaCalculation(string bag_name,
   int avg_len = 5;
   bool dist_okay = false;
   int count = 0;
+  
   // Write keyframes to object files
   WriteToObj(variables->object_file, variables->k1_output_name, count, variables->k1_keyframe);
   WriteToObj(variables->object_file, variables->k2_output_name, count, variables->k2_keyframe);
   WriteToBag("kinect_1", &keyframe_bag, variables->k1_keyframe);
   WriteToBag("kinect_2", &keyframe_bag, variables->k2_keyframe);
+  
   // Save normals and get size of normals
   all_normals.push_back(variables->k1_key_normal);
   all_normals.push_back(variables->k2_key_normal);
-  // size_t size = all_normals[0].size();
   int normal_size;
 
   vector<pcl::PointCloud<pcl::Normal> > saved_normals;
@@ -747,14 +717,6 @@ void DeltaCalculation(string bag_name,
       std::stringstream out;
       out << count;
       pcl::PCLPointCloud2 cloud_blob;
-//       pcl::io::loadPCDFile (str_key_normal_k1 + "_" + out.str() + ".pcd", cloud_blob);
-//       pcl::fromPCLPointCloud2 (cloud_blob, variables->k1_key_normal);
-//       pcl::io::loadPCDFile (str_key_normal_k2 + "_" + out.str() + ".pcd", cloud_blob);
-//       pcl::fromPCLPointCloud2 (cloud_blob, variables->k2_key_normal);
-//       pcl::io::loadPCDFile (str_prev_normal_k1 + "_" + out.str() + ".pcd", cloud_blob);
-//       pcl::fromPCLPointCloud2 (cloud_blob, variables->k1_prev_normal);
-//       pcl::io::loadPCDFile (str_prev_normal_k2 + "_" + out.str() + ".pcd", cloud_blob);
-//       pcl::fromPCLPointCloud2 (cloud_blob, variables->k2_prev_normal);
       pcl::io::loadPCDFile (str_normal_k1 + "_" + out.str() + ".pcd", cloud_blob);
       pcl::fromPCLPointCloud2 (cloud_blob, k1_normal);
       pcl::io::loadPCDFile (str_normal_k2 + "_" + out.str() + ".pcd", cloud_blob);
@@ -805,17 +767,8 @@ void DeltaCalculation(string bag_name,
     double k2_acc_velocity =
         std::accumulate(variables->k2_velocity_list.begin(), variables->k2_velocity_list.end(), 0.0);
     k2_acc_velocity = k2_acc_velocity / avg_len;
-    // cout << "Velocity print" << endl;
-    // *(variables->velocity_file) << count << "\t" << k1_velocity << "\t" << k2_velocity;
-    // cout << "Velocity print 2" << endl;
-    // *variables->velocity_file <<  "\t" << k1_acc_velocity << "\t" << k2_acc_velocity <<"\n";
-    // cout << "Velocity print 3" << endl;
-    // *variables->velocity_file << std::flush;
-    // cout << "Velocity print 4" << endl;
-    // *variables->velocity_file << std::flush;
-    // cout << "residual comparison" << endl;
+    
     // If our residual is large enough, or we are far enough from keyframe
-
     if ((k1_residual > 0.003 && k2_residual > 0.003) || dist_okay) {
       // Run ICP
       fprintf(stdout, "Kinect 1\n");
@@ -903,10 +856,10 @@ void DeltaCalculation(string bag_name,
   keyframe_bag.close();
 }
 
-void DeltaCalculationOne(string bag_name,
-                      vector<ros::Publisher> publishers,
-                      const int degree,
-                      const int kMaxClouds) {
+void DeltaCalculationSingle(string bag_name,
+                            vector<ros::Publisher> publishers,
+                            const int degree,
+                            const int kMaxClouds) {
   
   // --- INITIALIZATION ---
   DeltaCalVariables* variables = new DeltaCalVariables();
@@ -933,7 +886,7 @@ void DeltaCalculationOne(string bag_name,
   // Iterator over bag bag_name
   rosbag::View::iterator bag_it = view.begin();
   rosbag::View::iterator end = view.end();
-  bag_it = InitializeVariablesOne(bag_name, degree, bag_it, end, variables);
+  bag_it = InitializeVariablesSingle(bag_name, degree, bag_it, end, variables);
   ofstream pose_file (variables->pose_name.c_str());
   int avg_len = 5;
   bool dist_okay = false;
@@ -941,7 +894,6 @@ void DeltaCalculationOne(string bag_name,
   // Save normals and get size of normals
   all_normals.push_back(variables->k1_key_normal);
   // size_t size = all_normals[0].size();
-//   int normal_size;
 
   if((variables->k1_buffer.size() == 0)){
     cout << "first " << endl;
@@ -982,15 +934,6 @@ void DeltaCalculationOne(string bag_name,
   double k1_acc_velocity =
   std::accumulate(variables->k1_velocity_list.begin(), variables->k1_velocity_list.end(), 0.0);
   k1_acc_velocity = k1_acc_velocity / avg_len;
-  // cout << "Velocity print" << endl;
-  // *(variables->velocity_file) << count << "\t" << k1_velocity << "\t" << k2_velocity;
-  // cout << "Velocity print 2" << endl;
-  // *variables->velocity_file <<  "\t" << k1_acc_velocity << "\t" << k2_acc_velocity <<"\n";
-  // cout << "Velocity print 3" << endl;
-  // *variables->velocity_file << std::flush;
-  // cout << "Velocity print 4" << endl;
-  // *variables->velocity_file << std::flush;
-  // cout << "residual comparison" << endl;
   // If our residual is large enough, or we are far enough from keyframe
   
   if ((k1_residual > 0.003 ) || dist_okay) {
@@ -1047,10 +990,10 @@ void DeltaCalculationOne(string bag_name,
   variables->k1_prev = k1_cloud;
   variables->k1_prev_normal = k1_normal;
   variables->k1_prev_timestamp = variables->k1_timestamp;
-  //VisualizePoses(trajectory1, trajectory2, keys);
-    }
+  }
     keyframe_bag.close();
 }
+
 rosbag::View::iterator ClosestOdom(rosbag::View::iterator it, 
                                    rosbag::View::iterator end, 
                                    const double& timestamp, 
@@ -1090,7 +1033,8 @@ rosbag::View::iterator ClosestOdom(rosbag::View::iterator it,
     return it;
 }
 
-double* find_delta_odoms(const vector<double>& current, const vector<double>& previous) {
+double* DeltaFromOdom(const vector<double>& current, 
+                      const vector<double>& previous) {
   Eigen::Transform<double, 3, Eigen::Affine> current_transform;
   Eigen::Transform<double, 3, Eigen::Affine> previous_transform;
   // For the two poses create a transform
@@ -1153,11 +1097,10 @@ double* find_delta_odoms(const vector<double>& current, const vector<double>& pr
   return posek;
 }
 
-
 void DeltaCalculationOdometry(string bag_name,
-                         vector<ros::Publisher> publishers,
-                         const int degree,
-                         const int kMaxClouds) {
+                              vector<ros::Publisher> publishers,
+                              const int degree,
+                              const int kMaxClouds) {
   
   // --- INITIALIZATION ---
   DeltaCalVariables* variables = new DeltaCalVariables();
@@ -1176,7 +1119,7 @@ void DeltaCalculationOdometry(string bag_name,
   rosbag::View view(bag, rosbag::TopicQuery(topics));
   std::vector<std::string> odom_topics;
   odom_topics.push_back(std::string("/odom"));
-//   cout << "starting odom bag" << endl;
+  
   rosbag::View odom_view(bag, rosbag::TopicQuery(odom_topics));
   string str_key_normal_k1 = pcd_folder + "key_normal_k1";
   string str_key_normal_k2 = pcd_folder + "key_normal_k2";
@@ -1189,10 +1132,9 @@ void DeltaCalculationOdometry(string bag_name,
   rosbag::View::iterator end = view.end();
   rosbag::View::iterator odom_it = odom_view.begin();
   rosbag::View::iterator odom_end = odom_view.end();
-  bag_it = InitializeVariablesOne(bag_name, degree, bag_it, end, variables);
+  bag_it = InitializeVariablesSingle(bag_name, degree, bag_it, end, variables);
   vector<double> keyframe_odom, previous_odom;
   
-//   cout << "closest odom 1" << endl;
   odom_it = ClosestOdom(odom_it, odom_end, variables->k1_timestamp, &keyframe_odom);
   previous_odom = keyframe_odom;
   ofstream pose_file (variables->pose_name.c_str());
@@ -1205,10 +1147,8 @@ void DeltaCalculationOdometry(string bag_name,
   // size_t size = all_normals[0].size();
   
   if((variables->k1_buffer.size() == 0)){
-//     cout << "first " << endl;
   }
   if(bag_it == variables->end){
-//     cout << "second " << endl;
     cout << variables->k1_keyframe.size() << endl;
   }
   // While there are still clouds in both datasets
@@ -1222,7 +1162,7 @@ void DeltaCalculationOdometry(string bag_name,
                            &variables->k1_timestamps,
                            &k1_cloud, &variables->k1_timestamp);
   vector<double> current_odom;
-//   cout << "closest odom" << endl;
+  
   odom_it = ClosestOdom(odom_it, odom_end, variables->k1_timestamp, &current_odom);
   pcl::PointCloud<pcl::Normal> k1_normal;
   pcl::PointCloud<pcl::Normal> k2_normal;
@@ -1240,8 +1180,8 @@ void DeltaCalculationOdometry(string bag_name,
                                           k1_normal,
                                           k1_calculated_delta);
   // Accumulate and write velocities
-  const double k1_velocity = k1_residual / (variables->k1_timestamp - variables->k1_prev_timestamp);
-//   cout << "compute velocity" << endl;
+  const double k1_velocity = k1_residual / (variables->k1_timestamp - 
+variables->k1_prev_timestamp);
   variables->k1_velocity_list[count % avg_len] = k1_velocity;
   double k1_acc_velocity =
   std::accumulate(variables->k1_velocity_list.begin(), variables->k1_velocity_list.end(), 0.0);
@@ -1266,9 +1206,9 @@ void DeltaCalculationOdometry(string bag_name,
   // Check the magnitude of translation and angle of rotation, if larger
   // than some threshold, this is our next keyframe
   // If there has been sufficient change update keyframe and save deltas
-  double* previous_odom_delta = find_delta_odoms(current_odom, previous_odom);
+  double* previous_odom_delta = DeltaFromOdom(current_odom, previous_odom);
   
-  double* odom_delta = find_delta_odoms(current_odom, keyframe_odom);
+  double* odom_delta = DeltaFromOdom(current_odom, keyframe_odom);
   cout << endl;
   cout << "check delta odom" << endl;
   bool k1_change = CheckChangeVel(variables->k1_combined_transform, degree, variables->k1_velocity_list);
@@ -1277,7 +1217,7 @@ void DeltaCalculationOdometry(string bag_name,
   cout << endl;
   if(k1_change && k2_change) {
     dist_okay = false;
-    double* odom_delta = find_delta_odoms(current_odom, keyframe_odom);
+    double* odom_delta = DeltaFromOdom(current_odom, keyframe_odom);
     cout << endl;
     keyframe_odom = current_odom;
     vector<double> pose0(6, 0.0);
@@ -1285,8 +1225,8 @@ void DeltaCalculationOdometry(string bag_name,
     variables->k1_key_normal = k1_normal;
     variables->keys.push_back(count);
     
-    WritePoseFile(variables->k1_combined_transform, variables->k1_timestamp, count, pose_file);
-//     cout << "writing odom_delta" << endl;
+    WritePoseFile(variables->k1_combined_transform, variables->k1_timestamp, 
+count, pose_file);
     WritePoseFile(odom_delta, variables->k1_timestamp, count, pose_file);
     pose_file << endl;
     
@@ -1314,7 +1254,6 @@ void DeltaCalculationOdometry(string bag_name,
   variables->k1_prev_normal = k1_normal;
   variables->k1_prev_timestamp = variables->k1_timestamp;
   previous_odom = current_odom;
-  //VisualizePoses(trajectory1, trajectory2, keys);
     }
     keyframe_bag.close();
 }

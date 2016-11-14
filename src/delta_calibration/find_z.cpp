@@ -30,7 +30,10 @@ void TransformFromFile(string transform_file, double* transform) {
   cout << endl;
 }
 
-void find_z(string bag_file, string transform_file, vector<ros::Publisher> publishers) { 
+void FindZ(string bag_file, 
+           string transform_file, 
+           vector<ros::Publisher> 
+           publishers) { 
   // Get Transform from file
   double* transform = new double[6];
   TransformFromFile(transform_file, transform);
@@ -57,18 +60,10 @@ void find_z(string bag_file, string transform_file, vector<ros::Publisher> publi
                            &cloud, &time);
 
   
-  // Naively find the greatest z value as the height
+  // Naive Solution find the greatest z value as the height
   pcl::PointXYZ min, max;
   pcl::getMinMax3D(cloud, min, max);
   cout << "Greatest Z: " << max << endl;
-  // More complicated, find all planes, find the plane with the normal the closest to perpendicular to the z axis, and then find the distance from 0,0,0 along this normal to that plane.
-  vector<Eigen::Vector4d> normal_equations;
-  vector<Eigen::Vector3d> k1_centroids;
-  // Retrieve the planes from the clouds
-//   vector<pcl::PointCloud<pcl::PointXYZ> > planes = getPlanes(cloud, &normal_equations, &k1_centroids);
-  // Loop over normal equations to find the one most similar to the z-normal (rediscover the format of these equations)
-  
-  // Given that plane find the z value of it's centroid as the distance.
 }
 
 int main(int argc, char **argv) {
@@ -111,7 +106,7 @@ int main(int argc, char **argv) {
   n.advertise<visualization_msgs::MarkerArray>(
       "visualization_marker_array", 10);
 
-  find_z(bag_file, transform_file, publishers);
+  FindZ(bag_file, transform_file, publishers);
   
   return 0;
 }

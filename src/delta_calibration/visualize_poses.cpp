@@ -10,7 +10,7 @@ ros::Publisher cloud_pub_4;
 ros::Publisher marker_pub;
 ros::Publisher markerArray_pub;
 
-void TransformFromFile(string transform_file, double* transform) {
+void TransformFromFile(const string& transform_file, double* transform) {
   // Get Transform from file
   string transform_string;
   std::ifstream infile(transform_file.c_str());
@@ -53,7 +53,6 @@ rosbag::View::iterator OdomFromBag(rosbag::View::iterator it,
     keyframe_odom->push_back(best_odom->pose.pose.orientation.w);
     return it;
 }
-
 
 vector<double> TransformOdom(
     const vector<double>& odom,
@@ -99,7 +98,9 @@ vector<double> TransformOdom(
   return output;
 }
 
-void visualize_poses(string bag_file, string transform_file, vector<ros::Publisher> publishers) { 
+void VisualizePoses(const string& bag_file, 
+                     const string& transform_file, 
+                     const vector<ros::Publisher>& publishers) { 
   // Get Transform from file
   double* transform = new double[6];
   double* start_kinect = new double[6];
@@ -131,28 +132,6 @@ void visualize_poses(string bag_file, string transform_file, vector<ros::Publish
   
   cout << "finished transform" << endl;
   
-//   //Visualize the original pose as the turtlebot, and the transformed pose as the kinect.
-//   visualization_msgs::Marker base;
-//   base.header.stamp = ros::Time();
-//   base.header.frame_id = "point_cloud";
-//   base.id = 0;
-//   base.pose.position.x = odom[1];
-//   base.pose.position.y = odom[2];
-//   base.pose.position.z = odom[3];
-//   base.type = visualization_msgs::Marker::ARROW;
-//   base.action = visualization_msgs::Marker::ADD;
-//   base.pose.orientation.x = odom[4];
-//   base.pose.orientation.y = odom[5];
-//   base.pose.orientation.z = odom[6];
-//   base.pose.orientation.w = odom[7];
-//   base.scale.x = 1;
-//   base.scale.y = 0.1;
-//   base.scale.z = 0.1;
-//   base.color.a = 1.0; // Don't forget to set the alpha!
-//   base.color.r = 0.0;
-//   base.color.g = 1.0;
-//   base.color.b = 0.0;
-//   
   //Visualize the original pose as the turtlebot, and the transformed pose as the kinect.
   visualization_msgs::Marker base;
   base.header.stamp = ros::Time();
@@ -263,7 +242,7 @@ int main(int argc, char **argv) {
   n.advertise<visualization_msgs::MarkerArray>(
       "visualization_marker_array", 10);
 
-  visualize_poses(bag_file, transform_file, publishers);
+  VisualizePoses(bag_file, transform_file, publishers);
   
   return 0;
 }

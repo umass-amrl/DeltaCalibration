@@ -30,7 +30,7 @@ sensor_msgs::PointCloud2 bmodel_cloud;
 ros::Publisher marker_pub;
 ros::Publisher markerArray_pub;
 
-void testNormals(string bagfile) {
+void TestNormals(string bagfile) {
   // Bag file for clouds
   cout << "Opening Bag" << endl;
   rosbag::Bag bag;
@@ -111,22 +111,6 @@ void testNormals(string bagfile) {
     double x = normal.normal_x / norm;
     double y = normal.normal_y / norm;
     double z = normal.normal_z / norm;
-//     visualization_msgs::Marker marker;
-//     marker.header.frame_id = "point_cloud";
-//     marker.id = i;
-//     marker.header.stamp = ros::Time();
-//     marker.type = visualization_msgs::Marker::SPHERE;
-//     marker.action = visualization_msgs::Marker::ADD;
-//     marker.scale.x = .02;
-//     marker.scale.y = .02;
-//     marker.scale.z = .02;
-//     marker.color.r = 0;
-//     marker.color.a = 1;
-//     marker.color.b = 0;
-//     marker.color.g = 1;
-//     marker.pose.position.x = x;
-//     marker.pose.position.y = y;
-//     marker.pose.position.z = z;
     geometry_msgs::Point point;
     point.x = x;
     point.y = y;
@@ -174,6 +158,6 @@ int main(int argc, char **argv) {
   markerArray_pub =
   n.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 
 10);
-  testNormals(bagFile);
+  TestNormals(bagFile);
   return 0;
 }
