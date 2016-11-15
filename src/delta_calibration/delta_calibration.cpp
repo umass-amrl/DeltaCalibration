@@ -1265,7 +1265,7 @@ int main(int argc, char **argv) {
   int max_clouds = INT_MAX;
   int max_delta_degrees = 0;
   char* bag_file = (char*)"pair_upright.bag";
-  bool test_mode = false;
+  int mode = 0;
   bool normal_mode = false;
   // Parse arguments.
   static struct poptOption options[] = {
@@ -1274,10 +1274,8 @@ int main(int argc, char **argv) {
         "NUM" },
     { "bag-file" , 'B', POPT_ARG_STRING, &bag_file ,0, "Process bag file" ,
         "STR" },
-    { "test-mode", 'T', POPT_ARG_NONE, &test_mode, 0, "Run simulation test",
+    { "mode-mode", 'M', POPT_ARG_NONE, &mode, 0, "Selec input mode",
         "NONE" },
-    { "test-mode", 'N', POPT_ARG_NONE, &normal_mode, 0, "Run simulation test",
-      "NONE" },
     POPT_AUTOHELP
     { NULL, 0, 0, NULL, 0, NULL, NULL }
   };
@@ -1313,10 +1311,15 @@ int main(int argc, char **argv) {
   n.advertise<visualization_msgs::MarkerArray>(
       "visualization_marker_array", 10);
 
-  if (test_mode) {
-    //TestDeltaCalc(1, publishers, marker_pub);
+  if (mode == 0) {
+    DeltaCalculation(bag_file, publishers, max_delta_degrees, 
+                     max_clouds);
+  } else if(mode == 1) {
+    DeltaCalculationOdometry(bag_file, publishers, max_delta_degrees, 
+                             max_clouds);
   } else {
-    DeltaCalculationOdometry(bag_file, publishers, max_delta_degrees, max_clouds);
+    DeltaCalculationSingle(bag_file, publishers, max_delta_degrees, 
+                           max_clouds);
   }
   return 0;
 }
