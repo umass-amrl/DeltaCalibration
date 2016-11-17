@@ -30,6 +30,60 @@ sensor_msgs::PointCloud2 bmodel_cloud;
 ros::Publisher marker_pub;
 ros::Publisher markerArray_pub;
 
+Eigen::Matrix3d CalcScatterMatrix(pcl::PointCloud<pcl::Normal> normals) {
+  Eigen::Matrix3d scatter;
+  scatter << 0, 0, 0,
+             0, 0, 0,
+             0, 0, 0;
+  
+  for(size_t i = 0; i < normals.size(); i++) {
+    Eigen::Vector3d point;
+    point[0] = normals[i].normal_x;
+    point[1] = normals[i].normal_y;
+    point[2] = normals[i].normal_z;
+    
+    Eigen::Matrix3d temp = point * point.transpose();
+    if(point.norm() > 0) {
+      scatter = scatter + temp;
+    }
+  }
+  return scatter / scatter.norm();
+}
+
+// Used to determine the difference between the given matrix and I
+// where I is determined to be the ideal covariance matrix
+double FrobeniusDistance(Eigen::Matrix3d mat1, Eigen::Matrix3d mat2) {
+  Eigen::Matrix3d diff = mat1 - mat2;
+  Eigen::Matrix3d mult = diff * diff.transpose();
+  double value = mult.trace();
+  return sqrt(value);
+}
+
+// Represents the difference between the eigen values of the matrix
+// imbalance in eigenvalues shows more uncertainty in one direction than others
+double EigenError(Eigen::Matrix3d mat) {
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigensolver(mat);
+  Eigen::MatrixXd values;
+//    cout << "The eigenvalues of A are:\n" << eigensolver.eigenvalues() << endl;
+//    cout << "Here's a matrix whose columns are eigenvectors of A \n"
+//         << "corresponding to these eigenvalues:\n"
+//         << eigensolver.eigenvectors() << endl;
+  values = eigensolver.eigenvalues();
+  double a = abs(values(0,0) - values(1,0));
+  double b = abs(values(0,0) -values(2,0));
+  double c = abs(values(1,0) -values(2,0));
+  cout << "A: " << a << " B: " << b << " C: " << c << endl; 
+  double error = (a + b + c) / 3;
+  return error;
+}
+
+double CorrelationMatrixDistance(Eigen::Matrix3d mat1, Eigen::Matrix3d mat2) {
+  Eigen::Matrix3d mult = mat1 * mat2.transpose();
+  double trace = mult.trace();
+  double div = trace / (mat1.norm() * mat2.norm());
+  return 1 - div;
+}
+
 void TestNormals(string bagfile) {
   // Bag file for clouds
   cout << "Opening Bag" << endl;
@@ -57,9 +111,6 @@ void TestNormals(string bagfile) {
   // and cloud k - 1, set the combined transform to the zero transform
   cout << "Getting Initial Clouds" << endl;
   // Keyframes
-  cout << "Retrieving Clouds From dequeu" << endl;
-  cout << buffer_k1.size() << endl;
-  cout << buffer_k2.size() << endl;
   pcl::PointCloud<pcl::PointXYZ> keyframe_k1;
   pcl::PointCloud<pcl::PointXYZ> keyframe_k2;
   double timestamp_1;
@@ -85,9 +136,13 @@ void TestNormals(string bagfile) {
   x.x = .5;
   y.y = .5;
   
-  bag_it = TimeAlignedClouds(bag_it, end,  &buffer_k1, &buffer_k2, &times_k1, 
-          &times_k2,
-          &keyframe_k1, &keyframe_k2, &timestamp_1, &timestamp_2);
+//   bag_it = TimeAlignedClouds(bag_it, end,  &buffer_k1, &buffer_k2, &times_k1, 
+//           &times_k2,
+//           &keyframe_k1, &keyframe_k2, &timestamp_1, &timestamp_2);
+  
+  bag_it = OneSensorClouds(bag_it, end, &buffer_k1,
+                              &times_k1,
+                             &keyframe_k1, &timestamp_1);
 
   pcl::PointCloud<pcl::Normal> normals = GetNormals(keyframe_k1);
   visualization_msgs::Marker marker;
@@ -108,22 +163,35 @@ void TestNormals(string bagfile) {
     double norm = 
         sqrt(pow(normal.normal_x,2) 
         + pow(normal.normal_y,2) + pow(normal.normal_z,2));
+
     double x = normal.normal_x / norm;
     double y = normal.normal_y / norm;
     double z = normal.normal_z / norm;
     geometry_msgs::Point point;
+    
     point.x = x;
     point.y = y;
     point.z = z;
+    if(norm > 0) {
     marker.points.push_back(point);
+    }
   }
   int i = 0;
-  while(true) {
-    cout << "publishing" << endl;
-    PublishCloud(keyframe_k1, cloud_pub);
-    marker_pub.publish(marker);
-    i++;
-  }
+  Eigen::Matrix3d scatter = CalcScatterMatrix(normals);
+  cout << scatter << endl;
+  Eigen::Matrix3d m;
+  m << 1, 0, 0,
+       0, 1, 0,
+       0, 0, 1;
+  cout << FrobeniusDistance(scatter, m) << endl;
+  cout << EigenError(scatter) << endl;
+  cout << CorrelationMatrixDistance(scatter,m) << endl;
+//   while(true) {
+//     cout << "publishing" << endl;
+//     PublishCloud(keyframe_k1, cloud_pub);
+//     marker_pub.publish(marker);
+//     i++;
+//   }
 }
 
 int main(int argc, char **argv) {
