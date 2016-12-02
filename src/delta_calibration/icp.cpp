@@ -957,7 +957,7 @@ void BuildProblem(
     double distance = PointDistance(k_point, l_point);
 
     // Add non nan values to the problem
-    if (distance < nn_dist) {
+    if (distance < nn_dist && distance > 0) {
       const Vector3d point_0(k_point.x, k_point.y, k_point.z);
       const Vector3d point_1(l_point.x, l_point.y, l_point.z);
       const Vector3d normal_0(normal_k.normal_x,
@@ -1038,6 +1038,7 @@ double ResidualDist(
   // ceres::Solve(options, &problem, &summary);
   //std::cout << summary.FullReport() << "\n";
   vector<double> residuals;
+  residuals.clear();
   ceres::Problem::EvaluateOptions evalOptions =
       ceres::Problem::EvaluateOptions();
   // std::vector<double*> parameter_blocks;
@@ -1048,7 +1049,9 @@ double ResidualDist(
   double rmse = 0.0;
   for (size_t i= 0; i < residuals.size(); ++i) {
     rmse += sq(residuals[i]);
+//     cout <<  sq(residuals[i]) << endl;
   }
+  cout << "RMSE: " << rmse << endl;
   rmse = sqrt(rmse / static_cast<double>(residuals.size()));
   //cout << "RMSE: " << rmse << endl;
   return rmse;
@@ -2019,7 +2022,7 @@ rosbag::View::iterator GetClouds(rosbag::View::iterator it,
         buffer1->push_back(pcl_cloud);
         timestamps_1->push_back(imageMsg->header.stamp.toSec());
       }
-      else{
+      else if(imageMsg->header.frame_id == kinect_1) {
 //         cout << "pushing back 2" << endl;
         buffer2->push_back(pcl_cloud);
         timestamps_2->push_back(imageMsg->header.stamp.toSec());
@@ -2145,6 +2148,7 @@ rosbag::View::iterator TimeAlignedClouds(rosbag::View::iterator it,
       }
     }
   }
+  cout << best_deltaT << endl;
   // return those two as the current clouds to use
   (*cloud1) = cloud_k1;
   *cloud2 = cloud_k2;
@@ -2251,7 +2255,7 @@ bool CheckChangeVel(double* pose, const int degree,
   fprintf(stdout, "Velocity: %f\n", velocity);
   if(degree > 0) {
     cout << "Degree" << endl;
-    if(abs(velocity) < .05) {
+    if(abs(velocity) < .3) {
       if ((angle_degree > degree)) {
         cout << "TRUE" << endl;
         return true;

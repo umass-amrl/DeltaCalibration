@@ -84,6 +84,13 @@ double CorrelationMatrixDistance(Eigen::Matrix3d mat1, Eigen::Matrix3d mat2) {
   return 1 - div;
 }
 
+double CalcConditionNumber(Eigen::Matrix3d mat1) {
+  Eigen::JacobiSVD<Eigen::MatrixXd> svd(mat1);
+  double cond = svd.singularValues()(0) 
+  / svd.singularValues()(svd.singularValues().size()-1);
+  return cond;
+}
+
 void TestNormals(string bagfile) {
   // Bag file for clouds
   cout << "Opening Bag" << endl;
@@ -186,6 +193,7 @@ void TestNormals(string bagfile) {
   cout << FrobeniusDistance(scatter, m) << endl;
   cout << EigenError(scatter) << endl;
   cout << CorrelationMatrixDistance(scatter,m) << endl;
+  cout << CalcConditionNumber(scatter) << endl;
 //   while(true) {
 //     cout << "publishing" << endl;
 //     PublishCloud(keyframe_k1, cloud_pub);

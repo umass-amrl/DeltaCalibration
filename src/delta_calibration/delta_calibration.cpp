@@ -118,6 +118,12 @@ void CalculateDelta(
        empty_coords,
        calculated_delta,
        NULL);
+  Eigen::Matrix<double,3,1> axis(calculated_delta[0], calculated_delta[1], calculated_delta[2]);
+  Eigen::Matrix<double,3,1> trans(calculated_delta[3], calculated_delta[4], calculated_delta[5]);
+  const double angle = axis.norm();
+  double angle_degree = (180/3.14) * angle;
+  cout << "Instant angular rotation: " << angle_degree << endl;
+  *final_rmse = angle_degree;
 //       fprintf(stdout, "ICP 1 \n");
 //    combine the transform returned by ICP with the combined transform,
 //    and run ICP between clouds k and the last keyframe
@@ -527,16 +533,19 @@ void DeltaCalculationSlam(string bag_name,
   double k2_calculated_delta[6];
   
   // Check the residual distance against threshold
-  const double k1_residual = ResidualDist(variables->k1_prev,
-                                          k1_cloud,
-                                          variables->k1_prev_normal,
-                                          k1_normal,
-                                          k1_calculated_delta);
+  // Check the residual distance against threshold
+  //     const double k1_residual = ResidualDist(variables->k1_prev,
+  //                                           k1_cloud,
+  //                                                variables->k1_prev_normal,
+  //                                           k1_normal,
+  //                                           k1_calculated_delta);
+  const double k1_residual = 0;
   const double k2_residual = ResidualDist(variables->k2_prev,
                                           k2_cloud,
                                           variables->k2_prev_normal,
                                           k2_normal,
                                           k2_calculated_delta);
+
   // Accumulate and write velocities
   const double k1_velocity = k1_residual / (variables->k1_timestamp - variables->k1_prev_timestamp);
   const double k2_velocity = k2_residual / (variables->k2_timestamp - variables->k2_prev_timestamp);
@@ -673,6 +682,7 @@ void DeltaCalculation(string bag_name,
   rosbag::View::iterator bag_it = view.begin();
   rosbag::View::iterator end = view.end();
   bag_it = InitializeVariables(bag_name, degree, bag_it, end, variables);
+  variables->k2_prev_timestamp = variables->k2_timestamp;
   ofstream pose_file (variables->pose_name.c_str());
   int avg_len = 5;
   bool dist_okay = false;
@@ -747,30 +757,26 @@ void DeltaCalculation(string bag_name,
 
     // Check the residual distance against threshold
     const double k1_residual = ResidualDist(variables->k1_prev,
-                                          k1_cloud,
-                                               variables->k1_prev_normal,
-                                          k1_normal,
-                                          k1_calculated_delta);
+                                            k1_cloud,
+                                            variables->k1_prev_normal, 
+                                            k1_normal,
+                                            k1_calculated_delta);
     const double k2_residual = ResidualDist(variables->k2_prev,
-                                          k2_cloud,
-                                               variables->k2_prev_normal,
-                                          k2_normal,
-                                          k2_calculated_delta);
+                                            k2_cloud,
+                                            variables->k2_prev_normal,
+                                            k2_normal,
+                                            k2_calculated_delta);
+    
     // Accumulate and write velocities
-    const double k1_velocity = k1_residual / (variables->k1_timestamp - variables->k1_prev_timestamp);
-    const double k2_velocity = k2_residual / (variables->k2_timestamp - variables->k2_prev_timestamp);
-      variables->k1_velocity_list[count % avg_len] = k1_velocity;
-      variables->k2_velocity_list[count % avg_len] = k2_velocity;
-    double k1_acc_velocity =
-        std::accumulate(variables->k1_velocity_list.begin(), variables->k1_velocity_list.end(), 0.0);
-    k1_acc_velocity = k1_acc_velocity / avg_len;
-    double k2_acc_velocity =
-        std::accumulate(variables->k2_velocity_list.begin(), variables->k2_velocity_list.end(), 0.0);
-    k2_acc_velocity = k2_acc_velocity / avg_len;
+    
+    cout << "k1_residual: " << k1_residual << " Time 1: " << variables->k1_timestamp << "Time 2: " << variables->k1_prev_timestamp << endl;
+    cout << "k2_residual: " << k2_residual << " Time 1: " << variables->k2_timestamp << "Time 2: " << variables->k2_prev_timestamp << endl;
+    
     
     // If our residual is large enough, or we are far enough from keyframe
-    if ((k1_residual > 0.003 && k2_residual > 0.003) || dist_okay) {
+    if ((k1_residual > 0.003 || k2_residual > 0.003) || dist_okay) {
       // Run ICP
+      double rot1, rot2; // Amount of instananeous rotation
       fprintf(stdout, "Kinect 1\n");
       CalculateDelta(count,
                      publishers,
@@ -783,7 +789,7 @@ void DeltaCalculation(string bag_name,
                      k1_normal,
                      variables->k1_key_normal,
                      variables->k1_combined_transform,
-                     NULL);
+                     &rot1);
 
       fprintf(stdout, "Kinect 2\n");
       CalculateDelta(count,
@@ -797,7 +803,18 @@ void DeltaCalculation(string bag_name,
                      k2_normal,
 	             variables->k2_key_normal,
                      variables->k2_combined_transform,
-                     NULL);
+                     &rot2);
+      
+      const double k1_velocity = rot1 / (variables->k1_timestamp - variables->k1_prev_timestamp);
+      const double k2_velocity = rot2 / (variables->k2_timestamp - variables->k2_prev_timestamp);
+      variables->k1_velocity_list[count % avg_len] = k1_velocity;
+      variables->k2_velocity_list[count % avg_len] = k2_velocity;
+      double k1_acc_velocity =
+      std::accumulate(variables->k1_velocity_list.begin(), variables->k1_velocity_list.end(), 0.0);
+      k1_acc_velocity = k1_acc_velocity / avg_len;
+      double k2_acc_velocity =
+      std::accumulate(variables->k2_velocity_list.begin(), variables->k2_velocity_list.end(), 0.0);
+      k2_acc_velocity = k2_acc_velocity / avg_len;
     }
     // Check the magnitude of translation and angle of rotation, if larger
     // than some threshold, this is our next keyframe
