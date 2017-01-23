@@ -1051,7 +1051,7 @@ double ResidualDist(
     rmse += sq(residuals[i]);
 //     cout <<  sq(residuals[i]) << endl;
   }
-  cout << "RMSE: " << rmse << endl;
+//   cout << "RMSE: " << rmse << endl;
   rmse = sqrt(rmse / static_cast<double>(residuals.size()));
   //cout << "RMSE: " << rmse << endl;
   return rmse;
@@ -2251,11 +2251,14 @@ bool CheckChangeVel(double* pose, const int degree,
   //cout << "angle: " << angle << endl;
   double velocity = std::accumulate(velocity_list.begin(),
       velocity_list.end(), 0.0);
+  for (auto i: velocity_list) {
+    cout << i << endl;
+  }
   velocity = velocity / velocity_list.size();
   fprintf(stdout, "Velocity: %f\n", velocity);
   if(degree > 0) {
     cout << "Degree" << endl;
-    if(abs(velocity) < .3) {
+    if(abs(velocity) < 2.5) {
       if ((angle_degree > degree)) {
         cout << "TRUE" << endl;
         return true;
@@ -2275,6 +2278,101 @@ bool CheckChangeVel(double* pose, const int degree,
     }
   }
   return false;
+}
+
+// Removes components of a transform which cannot be disambiguated by the normals 
+// in the scene. This could create false transforms given translations caused by rotations (potentially). 
+// To insure this doesn't happen, motion has to be controlled to prevent ambigous translation from rotation.
+// (Assumes the actual motion can be disambiguated by the given scene
+void SanitizeTransform(const pcl::PointCloud<pcl::PointXYZ>& cloud,
+                       const pcl::PointCloud<pcl::Normal>& normal,
+                       double* pose) {
+  Eigen::Matrix<double,3,1> axis(pose[0], pose[1], pose[2]);
+  const double angle = axis.norm();
+  Eigen::Matrix<double, 3, 1> translation(pose[3],pose[4],pose[5]);
+  Eigen::AngleAxis<double> aa(angle, axis);
+  Eigen::Matrix3d rotation;
+  rotation = aa.toRotationMatrix();
+  Eigen::Vector3d eulers = rotation.eulerAngles(0,1,2);
+  Eigen::Matrix<double, 3, 1> x(1,0,0);
+  Eigen::Matrix<double, 3, 1> y(0,1,0);
+  Eigen::Matrix<double, 3, 1> z(0,0,1);
+  int x_count = 0;
+  int y_count = 0;
+  int z_count = 0;
+  int transx_count = 0;
+  int transy_count = 0;
+  int transz_count = 0;
+  
+  for(size_t i = 0; i < normal.size(); i++) {
+    pcl::Normal norm = normal[i];
+    // If an axis of rotation is parallel to all feature normals, then it is ambiguous
+    Eigen::Matrix<double, 3, 1> norm_vector(norm.normal_x,norm.normal_y,norm.normal_z);
+    Eigen::Matrix<double, 3, 1> x_cross = norm_vector.cross(x);
+    Eigen::Matrix<double, 3, 1> y_cross = norm_vector.cross(y);
+    Eigen::Matrix<double, 3, 1> z_cross = norm_vector.cross(z);
+    if(x_cross.norm() > 0.01) {
+      x_count++;
+    }
+    if(y_cross.norm() > 0.01) {
+      y_count++;
+    }
+    if(z_cross.norm() > 0.01) {
+      z_count++;
+    }
+    // If a translation is orthogonal to all normals, it is ambigous
+    double transx_dot = norm_vector.dot(x);
+    double transy_dot = norm_vector.dot(y);
+    double transz_dot = norm_vector.dot(x);
+    if(transx_dot > 0.01) {
+      transx_count++;
+    }
+    if(transy_dot > 0.01) {
+      transy_count++;
+    }
+    if(transz_dot > 0.01) {
+      transz_count++;
+    }
+  }
+  
+  if(transx_count < 20) {
+    translation[0] = 0;
+  }
+  if(transy_count < 20) {
+    translation[1] = 0;
+  }
+  if(transz_count < 20) {
+    translation[2] = 0;
+  }
+  if(x_count < 20) {
+    eulers[0] = 0;
+  }
+  if(y_count < 20) {
+    eulers[1] = 0;
+  }
+  if(z_count < 20) {
+    eulers[2] = 0;
+  }
+  Eigen::Matrix3d m;
+  m = Eigen::AngleAxisd(eulers[0], Eigen::Vector3d::UnitX())
+  * Eigen::AngleAxisd(eulers[1], Eigen::Vector3d::UnitY())
+  * Eigen::AngleAxisd(eulers[2], Eigen::Vector3d::UnitZ());
+  Eigen::AngleAxis<double> aaa;
+  aaa.fromRotationMatrix(m);
+  pose[3] = translation[0];
+  pose[4] = translation[1];
+  pose[5] = translation[2];
+  
+  // Get the axis
+  Eigen::Vector3d normal_axis = aaa.axis();
+  
+  // Recompute the rotation angle
+  double combined_angle = aaa.angle();
+  Eigen::Vector3d combined_axis = normal_axis * combined_angle;
+  pose[0] = combined_axis[0];
+  pose[1] = combined_axis[1];
+  pose[2] = combined_axis[2];
+  
 }
 
 bool CheckChangeOdom(double* pose, double* previous_pose, const double& timestamp_1, const double& timestamp_2, const int& degree) {

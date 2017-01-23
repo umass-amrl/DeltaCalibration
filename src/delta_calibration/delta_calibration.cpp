@@ -769,8 +769,8 @@ void DeltaCalculation(string bag_name,
     
     // Accumulate and write velocities
     
-    cout << "k1_residual: " << k1_residual << " Time 1: " << variables->k1_timestamp << "Time 2: " << variables->k1_prev_timestamp << endl;
-    cout << "k2_residual: " << k2_residual << " Time 1: " << variables->k2_timestamp << "Time 2: " << variables->k2_prev_timestamp << endl;
+//     cout << "k1_residual: " << k1_residual << " Time 1: " << variables->k1_timestamp << "Time 2: " << variables->k1_prev_timestamp << endl;
+//     cout << "k2_residual: " << k2_residual << " Time 1: " << variables->k2_timestamp << "Time 2: " << variables->k2_prev_timestamp << endl;
     
     
     // If our residual is large enough, or we are far enough from keyframe
@@ -829,7 +829,8 @@ void DeltaCalculation(string bag_name,
       variables->k2_key_normal = k2_normal;
       variables->k1_key_normal = k1_normal;
       variables->keys.push_back(count);
-
+      SanitizeTransform(k1_cloud, k1_normal, variables->k1_combined_transform);
+      SanitizeTransform(k2_cloud, k2_normal, variables->k2_combined_transform);
       WritePoseFile(variables->k1_combined_transform, variables->k1_timestamp, count, pose_file);
       WritePoseFile(variables->k2_combined_transform, variables->k2_timestamp, count, pose_file);
       pose_file << endl;

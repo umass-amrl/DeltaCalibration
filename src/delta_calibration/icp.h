@@ -125,6 +125,10 @@ void TransformPointCloudQuat(
   pcl::PointCloud<pcl::PointXYZ>* cloud,
   double transform[7]);
 
+void SanitizeTransform(const pcl::PointCloud<pcl::PointXYZ>& cloud,
+                       const pcl::PointCloud<pcl::Normal>& normal,
+                       double* pose);
+
 void TransformPointCloud(
     pcl::PointCloud<pcl::PointXYZ>* cloud,
     const vector<double>& transform);
