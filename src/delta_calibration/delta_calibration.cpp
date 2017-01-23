@@ -322,6 +322,61 @@ rosbag::View::iterator InitializeVariablesSingle(
   return bag_it;  
   //--- End Initialization ---
   }
+  
+rosbag::View::iterator InitializeVariablesBrass(
+    string bag_name,
+    int degree,
+    rosbag::View::iterator bag_it,
+    rosbag::View::iterator end,
+    DeltaCalVariables* input) {
+  
+  // --- INITIALIZATION ---
+  // Degree to string
+  std::stringstream out;
+  out << degree;
+  
+  // Initializing output file names
+  
+  input->bag_name = bag_name +
+  "_" + out.str();
+  input->k1_output_name = "cloud_" + out.str() + "_1";
+  
+  input->object_file = bag_name + "_objects";
+  input->covariance_file = bag_name + "_covariance";
+  input->k1_covariance = "covariance_" + out.str() + "_1";
+  
+  input->k1_base_name =  input->k1_output_name + ".base";
+  
+  // Opening pose and trajectory files
+  input->pose_name = "brass.pose";
+  input->velocity_name = bag_name + ".velocity";
+  input->trajectory_name = bag_name + ".traj";
+  ofstream traj_file (input->trajectory_name.c_str());
+  ofstream pose_file (input->pose_name.c_str());
+  ofstream velocity_file (input->velocity_name.c_str());
+  input->pose_file = &pose_file;
+  input->traj_file = &traj_file;
+  input->velocity_file = &velocity_file;
+  vector<double> k1_velocity_list(10);
+  input->k1_velocity_list = k1_velocity_list;
+  // Read in the first cloud from each kinect, set it as the keyframe
+  // and cloud k - 1, set the combined transform to the zero transform
+  bag_it = OneSensorCloudsBrass(bag_it, end, &input->k1_buffer,
+                           &(input->k1_timestamps),
+                           &input->k1_keyframe, &input->k1_timestamp);
+  // Key normals
+  //   cout << "Calculating Normals" << endl;
+  input->k1_key_normal = GetNormals(input->k1_keyframe);
+  // Previous clouds
+  input->k1_prev = input->k1_keyframe;
+  // Previous normals
+  input->k1_prev_normal = input->k1_key_normal;
+  vector<double> pose0(6, 0.0);
+  std::copy(pose0.begin(), pose0.end(), input->k1_combined_transform);
+  // Lists used to threshold over velocity
+  return bag_it;  
+  //--- End Initialization ---
+  }
 
 rosbag::View::iterator InitializeVariablesSlam(
     string bag_name,
@@ -424,6 +479,7 @@ void DeltaCalculationSlam(string bag_name,
   
   // --- INITIALIZATION ---
   DeltaCalVariables* variables = new DeltaCalVariables();
+
   // Opening bagfile
   string bag_file = bag_name + ".bag";
   string pcd_folder = bag_name + "pcd_file/";
@@ -436,6 +492,7 @@ void DeltaCalculationSlam(string bag_name,
   keyframe_bag.open(keyframe_bag_name, rosbag::bagmode::Write);
   cout << "Bag open" << endl;
   std::vector<std::string> topics;
+  
   // Topics to read data from
   topics.push_back(std::string("/kinect_1/depth_registered/image_raw"));
   std::vector<std::string> topics2;
@@ -1198,7 +1255,7 @@ void DeltaCalculationOdometry(string bag_name,
                                           k1_calculated_delta);
   // Accumulate and write velocities
   const double k1_velocity = k1_residual / (variables->k1_timestamp - 
-variables->k1_prev_timestamp);
+    variables->k1_prev_timestamp);
   variables->k1_velocity_list[count % avg_len] = k1_velocity;
   double k1_acc_velocity =
   std::accumulate(variables->k1_velocity_list.begin(), variables->k1_velocity_list.end(), 0.0);
@@ -1243,7 +1300,7 @@ variables->k1_prev_timestamp);
     variables->keys.push_back(count);
     
     WritePoseFile(variables->k1_combined_transform, variables->k1_timestamp, 
-count, pose_file);
+        count, pose_file);
     WritePoseFile(odom_delta, variables->k1_timestamp, count, pose_file);
     pose_file << endl;
     
@@ -1255,6 +1312,167 @@ count, pose_file);
     std::copy(pose0.begin(), pose0.end(), variables->k1_combined_transform);
     WriteToObj(variables->object_file, variables->k1_output_name, count, temp_cloud1);
     WriteToObj(variables->object_file, variables->k1_base_name, count, k1_cloud);
+    
+  }
+  // Checking to see if we have a significant change from the predecessor
+  else{
+    if(CheckChange(variables->k1_combined_transform, degree)) {
+      dist_okay = true;
+      }
+      else{
+        dist_okay = false;
+      }
+  }
+  // Update predecessor clouds
+  variables->k1_prev = k1_cloud;
+  variables->k1_prev_normal = k1_normal;
+  variables->k1_prev_timestamp = variables->k1_timestamp;
+  previous_odom = current_odom;
+    }
+    keyframe_bag.close();
+}
+
+void DeltaCalculationBrass(string bag_name,
+                              vector<ros::Publisher> publishers,
+                              const int degree,
+                              const int kMaxClouds) {
+  
+  // --- INITIALIZATION ---
+  bool log = false;
+  DeltaCalVariables* variables = new DeltaCalVariables();
+  //Opening bagfile
+  string bag_file = bag_name + ".bag";
+  vector<pcl::PointCloud<pcl::Normal> > all_normals;
+  rosbag::Bag bag, keyframe_bag;
+  bag.open(bag_file, rosbag::bagmode::Read);
+  
+  std::vector<std::string> topics;
+  topics.push_back(std::string("/camera/depth/points"));
+  rosbag::View view(bag, rosbag::TopicQuery(topics));
+  std::vector<std::string> odom_topics;
+  odom_topics.push_back(std::string("/odom"));
+  
+  rosbag::View odom_view(bag, rosbag::TopicQuery(odom_topics));
+  
+  // Iterator over bag bag_name
+  rosbag::View::iterator bag_it = view.begin();
+  rosbag::View::iterator end = view.end();
+  rosbag::View::iterator odom_it = odom_view.begin();
+  rosbag::View::iterator odom_end = odom_view.end();
+  bag_it = InitializeVariablesBrass(bag_name, degree, bag_it, end, variables);
+  
+  vector<double> keyframe_odom, previous_odom;
+  odom_it = ClosestOdom(odom_it, odom_end, variables->k1_timestamp, &keyframe_odom);
+  previous_odom = keyframe_odom;
+  ofstream pose_file (variables->pose_name.c_str());
+  ofstream odom_file ("brass_odom.txt"); // Figure out odometry file?
+  
+  int avg_len = 5;
+  bool dist_okay = false;
+  int count = 0;
+  // Save normals and get size of normals
+  
+  // While there are still clouds in both datasets
+  while(((variables->k1_buffer.size() != 0)
+    || (bag_it != variables->end))) {
+    count += 1;
+  
+  cout << "Frame: " << count << endl;
+  
+  // Read in a new cloud from each dataset
+  pcl::PointCloud<pcl::PointXYZ> k1_cloud;
+  bag_it = OneSensorCloudsBrass(bag_it, end, &variables->k1_buffer,
+                           &variables->k1_timestamps,
+                           &k1_cloud, &variables->k1_timestamp);
+  
+  vector<double> current_odom;
+  
+  odom_it = ClosestOdom(odom_it, odom_end, variables->k1_timestamp, &current_odom);
+  pcl::PointCloud<pcl::Normal> k1_normal;
+  pcl::PointCloud<pcl::Normal> k2_normal;
+  
+  // Get normals for the two clouds
+  k1_normal = GetNormals(k1_cloud);
+  PublishCloud(k1_cloud,cloud_pub_3);
+  // If the residual distance between either of these clouds (unmodified) and
+  // the clouds k - 1 is large enough continue (otherwise read in new clouds)
+  double k1_calculated_delta[6];
+  
+  // Check the residual distance against threshold
+  const double k1_residual = ResidualDist(variables->k1_prev,
+                                          k1_cloud,
+                                          variables->k1_prev_normal,
+                                          k1_normal,
+                                          k1_calculated_delta);
+  // Accumulate and write velocities
+  const double k1_velocity = k1_residual / (variables->k1_timestamp - 
+    variables->k1_prev_timestamp);
+  variables->k1_velocity_list[count % avg_len] = k1_velocity;
+  double k1_acc_velocity =
+  std::accumulate(variables->k1_velocity_list.begin(), variables->k1_velocity_list.end(), 0.0);
+  k1_acc_velocity = k1_acc_velocity / avg_len;
+  
+  // I don't know if these residual values are reasonable. Although we
+  // have the advantage of only needing one residual (will check against lab computers and other methods)
+  if ((k1_residual > 0.003 ) || dist_okay) {
+    // Run ICP
+    fprintf(stdout, "Kinect 1\n");
+    CalculateDelta(count,
+                   publishers,
+                   variables->covariance_file,
+                   variables->k1_covariance,
+                   variables->k1_prev,
+                   k1_cloud,
+                   variables->k1_keyframe,
+                   variables->k1_prev_normal,
+                   k1_normal,
+                   variables->k1_key_normal,
+                   variables->k1_combined_transform,
+                   NULL);
+  }
+  // Check the magnitude of translation and angle of rotation, if larger
+  // than some threshold, this is our next keyframe
+  // If there has been sufficient change update keyframe and save deltas
+  
+  // Calculate Delta From Odometry between this and the previous odometry frame
+  double* previous_odom_delta = DeltaFromOdom(current_odom, previous_odom);
+  // Calculate the keyframe odometry delta
+  double* odom_delta = DeltaFromOdom(current_odom, keyframe_odom);
+  // Have to watch the check changes when I test this
+  cout << endl;
+  cout << "check delta odom" << endl;
+  bool k1_change = CheckChangeVel(variables->k1_combined_transform, degree, variables->k1_velocity_list);
+  cout << "check change odom" << endl;
+  bool k2_change = CheckChangeOdom(odom_delta, previous_odom_delta, current_odom[0], previous_odom[0],  degree);
+  cout << endl;
+  // If there is enough change
+  if(k1_change && k2_change) {
+    dist_okay = false;
+    // This is getting calculated twice but I don't know why.
+    double* odom_delta = DeltaFromOdom(current_odom, keyframe_odom);
+    cout << endl;
+    keyframe_odom = current_odom;
+    vector<double> pose0(6, 0.0);
+    variables->k1_keyframe = k1_cloud;
+    variables->k1_key_normal = k1_normal;
+    variables->keys.push_back(count);
+    
+    // Writes both deltas to the same file
+    WritePoseFile(variables->k1_combined_transform, variables->k1_timestamp, 
+        count, pose_file);
+    WritePoseFile(odom_delta, variables->k1_timestamp, count, pose_file);
+    pose_file << endl;
+    
+    // Transform the clouds and then write them to object files
+    if(log) {
+    pcl::PointCloud<pcl::PointXYZ> temp_cloud1 = k1_cloud;
+    WriteToBag("kinect_1", &keyframe_bag, k1_cloud);
+    TransformPointCloud(&temp_cloud1, variables->k1_combined_transform);
+    // Zero Combined transforms
+    std::copy(pose0.begin(), pose0.end(), variables->k1_combined_transform);
+    WriteToObj(variables->object_file, variables->k1_output_name, count, temp_cloud1);
+    WriteToObj(variables->object_file, variables->k1_base_name, count, k1_cloud);
+    }
     
   }
   // Checking to see if we have a significant change from the predecessor

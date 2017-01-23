@@ -32,7 +32,7 @@ void PublishCloud(
   pcl::PCLPointCloud2 pcl_cloud;
   pcl::toPCLPointCloud2(cloud, pcl_cloud);
   pcl_conversions::fromPCL(pcl_cloud, temp_cloud);
-  temp_cloud.header.frame_id = "point_cloud";
+  temp_cloud.header.frame_id = "map";
   publisher.publish(temp_cloud);
 }
 
@@ -43,7 +43,7 @@ void PublishCloud(
   pcl::PCLPointCloud2 pcl_cloud;
   pcl::toPCLPointCloud2(cloud, pcl_cloud);
   pcl_conversions::fromPCL(pcl_cloud, temp_cloud);
-  temp_cloud.header.frame_id = "point_cloud";
+  temp_cloud.header.frame_id = "map";
 
   publisher.publish(temp_cloud);
 }
@@ -132,7 +132,6 @@ template <class T> Eigen::Matrix<T,3,1> TransformPointInv(
   return transformed_point;
 }
 
-// Transforms a given eigen point by the given transform (array containing quaternion)
 // Transforms a given eigen point by the given transform (array containing quaternion)
 Eigen::Matrix<double,3,1> TransformPointQuaternion(
     const Eigen::Matrix<double,3,1>& point,
@@ -1548,7 +1547,7 @@ pcl::PointCloud<pcl::PointXYZ> VoxelFilter(
   // Create the filtering object
   pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
   sor.setInputCloud (ptr_cloud);
-  sor.setLeafSize (0.01f, 0.01f, 0.01f);
+  sor.setLeafSize (.01f, 0.01f, 0.01f);
   sor.filter (*cloud_filtered);
   
   pcl::fromPCLPointCloud2(*cloud_filtered, cloud2);
@@ -1948,9 +1947,9 @@ pcl::PointCloud<pcl::PointXYZ> CloudFromVector(
   for (uint i = 0; i < cloud.size(); ++i) {
         pcl::PointXYZ point;
         if( pointCloud[i](0) < 3) {
-          point.x = pointCloud[i](0);
-          point.y = pointCloud[i](1);
-          point.z=  pointCloud[i](2);
+          point.x = pointCloud[i](1);
+          point.y = pointCloud[i](0);
+          point.z =  pointCloud[i](2);
         } else {
           point.x = 0;
           point.y = 0;
@@ -1959,6 +1958,7 @@ pcl::PointCloud<pcl::PointXYZ> CloudFromVector(
         cloud[i] = point;
     }
     return VoxelFilter(cloud);
+//       return cloud;
 }
 
 // Reads clouds from a given iterator, saves to buffer if they are over
@@ -1980,7 +1980,7 @@ rosbag::View::iterator GetCloudsSlamBag(rosbag::View::iterator it,
     filter.GenerateCompletePointCloud((void*)depth_msg->data.data(),
                                       pointCloud, pixelLocs);
     pcl::PointCloud<pcl::PointXYZ> pcl_cloud =
-    icp::CloudFromVector(pointCloud, pixelLocs);
+        icp::CloudFromVector(pointCloud, pixelLocs);
 //     cout << "cloud created" << endl;
     buffer1->push_back(pcl_cloud);
     timestamps_1->push_back(depth_msg->header.stamp.toSec());
@@ -2059,6 +2059,29 @@ rosbag::View::iterator GetCloudsOne(rosbag::View::iterator it,
         //         cout << "pushing back" << endl;
         buffer1->push_back(pcl_cloud);
         timestamps_1->push_back(imageMsg->header.stamp.toSec());
+      
+    }
+    advance(it, 1);
+  }
+  return it;
+}
+
+// Reads clouds from a given iterator, saves to buffer if they are over
+rosbag::View::iterator GetCloudsOneBrass(rosbag::View::iterator it,
+                                 std::deque<pcl::PointCloud<pcl::PointXYZ> >* buffer1,
+                                 std::deque<double>* timestamps_1) {
+  
+  while((buffer1->size() == 0)) {
+    const rosbag::MessageInstance &m = *it;
+    sensor_msgs::PointCloud2Ptr imageMsg = m.instantiate<sensor_msgs::PointCloud2>();
+    //cout << imageMsg->header.frame_id << endl;
+    if (imageMsg != NULL) {
+      pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
+      pcl::PCLPointCloud2 pcl_pc2;
+      pcl_conversions::toPCL(*imageMsg,pcl_pc2);
+      pcl::fromPCLPointCloud2(pcl_pc2,pcl_cloud);
+      buffer1->push_back(pcl_cloud);
+      timestamps_1->push_back(imageMsg->header.stamp.toSec());
       
     }
     advance(it, 1);
@@ -2166,6 +2189,26 @@ rosbag::View::iterator OneSensorClouds(rosbag::View::iterator it,
   
   // Fill the buffers
   it = GetCloudsOne(it, buffer1, timestamps_1);
+  // Get the earliest cloud from the first kinect
+  pcl::PointCloud<pcl::PointXYZ> cloud_k1 =  (*buffer1)[0];
+  buffer1->pop_front();
+  double k1_time = (*timestamps_1)[0];
+  timestamps_1->pop_front();
+  // return those two as the current clouds to use
+  (*cloud1) = VoxelFilter(cloud_k1);
+  *time1 = k1_time;
+  return it;
+}
+
+rosbag::View::iterator OneSensorCloudsBrass(rosbag::View::iterator it,
+                                         rosbag::View::iterator end,
+                                         std::deque<pcl::PointCloud<pcl::PointXYZ> >* buffer1,
+                                         std::deque<double>* timestamps_1,
+                                         pcl::PointCloud<pcl::PointXYZ>* cloud1,
+                                         double* time1) {
+  
+  // Fill the buffers
+  it = GetCloudsOneBrass(it, buffer1, timestamps_1);
   // Get the earliest cloud from the first kinect
   pcl::PointCloud<pcl::PointXYZ> cloud_k1 =  (*buffer1)[0];
   buffer1->pop_front();
