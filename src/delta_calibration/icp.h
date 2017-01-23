@@ -77,9 +77,13 @@ template <class T> Eigen::Matrix<T,3,1> TransformPoint(
     const Eigen::Matrix<T,3,1>& point,
     const T* transform);
 
-// template <class T> Eigen::Matrix<T,3,1> TransformPointQuat(
+// template <class T> Eigen::Matrix<T,3,1> TransformPointQuaternion(
 //   const Eigen::Matrix<T,3,1>& point,
 //   const T* transform);
+
+Eigen::Matrix<double,3,1> TransformPointQuaternion(
+    const Eigen::Matrix<double,3,1>& point,
+    double* pose);
 
 template <class T> Eigen::Matrix<T,3,1> TransformPointInv(
   const Eigen::Matrix<T,3,1>& point,
@@ -122,7 +126,7 @@ void TransformPointCloud(
     double transform[6]);
 
 void TransformPointCloudQuat(
-  pcl::PointCloud<pcl::PointXYZ>* cloud,
+  pcl::PointCloud<pcl::PointXYZ>& cloud,
   double transform[7]);
 
 void SanitizeTransform(const pcl::PointCloud<pcl::PointXYZ>& cloud,
@@ -335,6 +339,13 @@ rosbag::View::iterator TimeAlignedCloudsSlamBag(rosbag::View::iterator it,
                                                 double* time2);
 
 rosbag::View::iterator OneSensorClouds(rosbag::View::iterator it,
+                                       rosbag::View::iterator end,
+                                       std::deque<pcl::PointCloud<pcl::PointXYZ> >* buffer1,
+                                       std::deque<double>* timestamps_1,
+                                       pcl::PointCloud<pcl::PointXYZ>* cloud1,
+                                       double* time1);
+
+rosbag::View::iterator OneSensorCloudsBrass(rosbag::View::iterator it,
                                        rosbag::View::iterator end,
                                        std::deque<pcl::PointCloud<pcl::PointXYZ> >* buffer1,
                                        std::deque<double>* timestamps_1,
