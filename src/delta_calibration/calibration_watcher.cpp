@@ -7,6 +7,8 @@
 #include <nav_msgs/Odometry.h>
 #include "delta_calibration/icp.h"
 #include <pcl/common/common.h>
+#include <frontier_exploration/ExploreTaskAction.h>
+#include <actionlib/client/simple_action_client.h>
 
 ros::Publisher ground_error_pub;
 ros::Publisher calibration_error_pub;
@@ -18,6 +20,10 @@ double extrinsics[7] = {0, 0, .682, .732, -.087, -.0125, .2870};
 double current_pose[7];
 pcl::PointCloud<pcl::PointXYZ> global_cloud;
 double global_min;
+typedef actionlib::SimpleActionClient<frontier_exploration::ExploreTaskAction> Client;
+enum Mode{monitor, record, find_scene};
+
+Mode mode = monitor;
 
 void HandleStop(int i) {
   printf("\nTerminating.\n");
@@ -123,6 +129,41 @@ void OrientCloud(pcl::PointCloud<pcl::PointXYZ>* cloud) {
   }
 }
 
+void CheckGroundPlane(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud) {
+  pcl::PointXYZ min, max;
+  pcl::getMinMax3D(pcl_cloud, min, max);
+  
+  min.x = 0;
+  min.y = 0;
+  // Get neighbors of lowest point
+  int K = 50;
+  std::vector<int> neighbor_indices = GetNeighborsPCL(pcl_cloud, min, K);
+  
+  // Calculate the normal for the lowest point
+  Eigen::Vector4f plane_parameters;
+  float curvature;
+  pcl::computePointNormal(pcl_cloud, neighbor_indices, plane_parameters, curvature);
+  
+  
+  // Compare that normal to the z normal
+  Eigen::Vector3d z_axis = {0, 0, 1};
+  Eigen::Vector3d normal_axis = {plane_parameters[0], plane_parameters[1], plane_parameters[2]};
+  double angle = VectorAngle(z_axis, normal_axis);
+  
+  // Take the angle between the two and publish it as the error
+  std_msgs::Float32 error_msg;
+  error_msg.data = angle;
+  ground_error_pub.publish(error_msg);
+}
+
+void CheckSceneInformation(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud) {
+
+}
+
+void RecordDepth(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud) {
+  
+}
+
 void DepthCb(sensor_msgs::PointCloud2 msg) {
   pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
   pcl::PCLPointCloud2 pcl_pc2;
@@ -138,30 +179,13 @@ void DepthCb(sensor_msgs::PointCloud2 msg) {
   
   PublishCloud(pcl_cloud, cloud_pub_1);
   
-  pcl::PointXYZ min, max;
-  pcl::getMinMax3D(pcl_cloud, min, max);
-  
-  min.x = 0;
-  min.y = 0;
-  // Get neighbors of lowest point
-  int K = 50;
-  std::vector<int> neighbor_indices = GetNeighborsPCL(pcl_cloud, min, K);
-  
-  // Calculate the normal for the lowest point
-  Eigen::Vector4f plane_parameters;
-  float curvature;
-  pcl::computePointNormal(pcl_cloud, neighbor_indices, plane_parameters, curvature);
-
-  
-  // Compare that normal to the z normal
-  Eigen::Vector3d z_axis = {0, 0, 1};
-  Eigen::Vector3d normal_axis = {plane_parameters[0], plane_parameters[1], plane_parameters[2]};
-  double angle = VectorAngle(z_axis, normal_axis);
-  
-  // Take the angle between the two and publish it as the error
-  std_msgs::Float32 error_msg;
-  error_msg.data = angle;
-  ground_error_pub.publish(error_msg);
+  if(mode == monitor) {
+    CheckGroundPlane(pcl_cloud);
+  } else if(mode == find_scene) {
+    CheckSceneInformation(pcl_cloud);
+  } else if (mode == record) {
+    RecordDepth(pcl_cloud);
+  }
 }
 
 void OdomCb(const nav_msgs::Odometry& msg) {
@@ -177,6 +201,19 @@ void OdomCb(const nav_msgs::Odometry& msg) {
 void CommandCb(const std_msgs::String::ConstPtr& msg)
 {
   ROS_INFO("I heard: [%s]", msg->data.c_str());
+  string scene_find = "find_scene";
+  if(scene_find.compare(msg->data.c_str()) == 0) {
+    mode = find_scene;
+    Client client("explore_server", true);
+    client.waitForServer();
+    frontier_exploration::ExploreTaskGoal goal;
+    goal.explore_center.point.x = 0;
+    goal.explore_center.point.y = 0;
+    goal.explore_center.point.z = 0;
+    goal.explore_center.header.frame_id = "map";
+    goal.explore_boundary.header.frame_id = "map";
+    client.sendGoal(goal);
+  }
 }
 
 int main(int argc, char **argv) {
