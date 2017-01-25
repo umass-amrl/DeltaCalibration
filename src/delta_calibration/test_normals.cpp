@@ -30,25 +30,7 @@ sensor_msgs::PointCloud2 bmodel_cloud;
 ros::Publisher marker_pub;
 ros::Publisher markerArray_pub;
 
-Eigen::Matrix3d CalcScatterMatrix(pcl::PointCloud<pcl::Normal> normals) {
-  Eigen::Matrix3d scatter;
-  scatter << 0, 0, 0,
-             0, 0, 0,
-             0, 0, 0;
-  
-  for(size_t i = 0; i < normals.size(); i++) {
-    Eigen::Vector3d point;
-    point[0] = normals[i].normal_x;
-    point[1] = normals[i].normal_y;
-    point[2] = normals[i].normal_z;
-    
-    Eigen::Matrix3d temp = point * point.transpose();
-    if(point.norm() > 0) {
-      scatter = scatter + temp;
-    }
-  }
-  return scatter / scatter.norm();
-}
+
 
 // Used to determine the difference between the given matrix and I
 // where I is determined to be the ideal covariance matrix
@@ -84,12 +66,7 @@ double CorrelationMatrixDistance(Eigen::Matrix3d mat1, Eigen::Matrix3d mat2) {
   return 1 - div;
 }
 
-double CalcConditionNumber(Eigen::Matrix3d mat1) {
-  Eigen::JacobiSVD<Eigen::MatrixXd> svd(mat1);
-  double cond = svd.singularValues()(0) 
-  / svd.singularValues()(svd.singularValues().size()-1);
-  return cond;
-}
+
 
 void TestNormals(string bagfile) {
   // Bag file for clouds

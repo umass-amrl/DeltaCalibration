@@ -490,6 +490,33 @@ void WritePose(double* pose, ofstream file) {
   }
 }
 
+Eigen::Matrix3d CalcScatterMatrix(pcl::PointCloud<pcl::Normal> normals) {
+  Eigen::Matrix3d scatter;
+  scatter << 0, 0, 0,
+             0, 0, 0,
+             0, 0, 0;
+  
+  for(size_t i = 0; i < normals.size(); i++) {
+    Eigen::Vector3d point;
+    point[0] = normals[i].normal_x;
+    point[1] = normals[i].normal_y;
+    point[2] = normals[i].normal_z;
+    
+    Eigen::Matrix3d temp = point * point.transpose();
+    if(point.norm() > 0) {
+      scatter = scatter + temp;
+    }
+  }
+  return scatter / scatter.norm();
+}
+
+double CalcConditionNumber(Eigen::Matrix3d mat1) {
+  Eigen::JacobiSVD<Eigen::MatrixXd> svd(mat1);
+  double cond = svd.singularValues()(0) 
+  / svd.singularValues()(svd.singularValues().size()-1);
+  return cond;
+}
+
 // Transforms all points in a pcl point cloud (array input)
 void TransformPointCloud(
                           pcl::PointCloud<pcl::PointXYZ>* cloud,
@@ -1539,6 +1566,22 @@ void VisualizeCovariance(
 }
 
 pcl::PointCloud<pcl::PointXYZ> VoxelFilter(
+    const pcl::PointCloud<pcl::PointXYZ>& cloud) {
+  pcl::PCLPointCloud2::Ptr cloud_filtered (new pcl::PCLPointCloud2 ());
+  pcl::PCLPointCloud2::Ptr ptr_cloud (new pcl::PCLPointCloud2 ());
+  pcl::toPCLPointCloud2(cloud, *ptr_cloud);
+  pcl::PointCloud<pcl::PointXYZ> cloud2;
+  // Create the filtering object
+  pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
+  sor.setInputCloud (ptr_cloud);
+  sor.setLeafSize (.01f, 0.01f, 0.01f);
+  sor.filter (*cloud_filtered);
+  
+  pcl::fromPCLPointCloud2(*cloud_filtered, cloud2);
+  return cloud2;
+}
+
+pcl::PointCloud<pcl::PointXYZ> BrassVoxelFilter(
     const pcl::PointCloud<pcl::PointXYZ>& cloud) {
   pcl::PCLPointCloud2::Ptr cloud_filtered (new pcl::PCLPointCloud2 ());
   pcl::PCLPointCloud2::Ptr ptr_cloud (new pcl::PCLPointCloud2 ());

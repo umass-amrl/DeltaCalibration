@@ -4,19 +4,28 @@
 #include "std_msgs/Float32MultiArray.h"
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/Image.h>
+#include <geometry_msgs/Twist.h>
+#include <actionlib_msgs/GoalID.h>
+#include <actionlib_msgs/GoalStatusArray.h>
 #include <nav_msgs/Odometry.h>
 #include "delta_calibration/icp.h"
 #include <pcl/common/common.h>
 #include <frontier_exploration/ExploreTaskAction.h>
 #include <actionlib/client/simple_action_client.h>
+#include <rosbag/bag.h>
+#include <pthread.h>
 
 ros::Publisher ground_error_pub;
 ros::Publisher calibration_error_pub;
 ros::Publisher cloud_pub_1;
 ros::Publisher image_pub;
+ros::Publisher cancel_pub;
+ros::Publisher move_pub;
+ros::Publisher velocity_pub;
+rosbag::Bag bag;
 using namespace icp;
 using namespace std;
-double extrinsics[7] = {0, 0, .682, .732, -.087, -.0125, .2870};
+double extrinsics[7] = {0, 0, 0, 1, -.087, -.0125, .2870};
 double current_pose[7];
 pcl::PointCloud<pcl::PointXYZ> global_cloud;
 double global_min;
@@ -24,11 +33,19 @@ typedef actionlib::SimpleActionClient<frontier_exploration::ExploreTaskAction> C
 enum Mode{monitor, record, find_scene};
 
 Mode mode = monitor;
-
+vector<vector<double> > moves;
 void HandleStop(int i) {
   printf("\nTerminating.\n");
   exit(0);
 }
+
+template<typename T>
+void PopFront(std::vector<T>* vec)
+{
+  assert(!vec.empty());
+  vec.erase(vec.begin());
+}
+
 
 void DeltasFromFile(vector<vector<double> >* sensor_deltas,
                     vector<vector<double> >* odom_deltas) {
@@ -156,12 +173,88 @@ void CheckGroundPlane(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud) {
   ground_error_pub.publish(error_msg);
 }
 
-void CheckSceneInformation(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud) {
+void MakeMove(vector<double> move) {
+  geometry_msgs::PoseStamped message;
+  message.pose.position.x = current_pose[4] + move[4];
+  message.pose.position.y = current_pose[5] + move[5];
+  message.pose.position.z = current_pose[6] + move[6];
+  message.pose.orientation.x = current_pose[0] + move[0];
+  message.pose.orientation.y = current_pose[1] + move[1];
+  message.pose.orientation.z = current_pose[2] + move[2];
+  message.pose.orientation.w = current_pose[3] + move[3];
+  message.header.stamp = ros::Time::now();
+  message.header.frame_id = "map";
+  move_pub.publish(message);
+}
 
+void* worker_thread(void *arg) {
+  geometry_msgs::Twist message;
+  message.linear.x = 0;
+  message.linear.y = 0;
+  message.linear.z = 0;
+  message.angular.x = 0;
+  message.angular.y = 0;
+  message.angular.z = .2;
+  
+  for(int i = 0; i < 6; i++) {
+    for(int i = 0; i < 3; i++) {
+      cout << "Velocity published" << endl;
+      velocity_pub.publish(message);
+      sleep(3);
+    }
+    sleep(3);
+    message.angular.z = -message.angular.z;
+  }
+  message.angular.z = 0;
+  message.linear.x = .2;
+  for(int i = 0; i < 6; i++) {
+    for(int i = 0; i < 1; i++) {
+      velocity_pub.publish(message);
+      sleep(3);
+    }
+    sleep(3);
+    message.linear.x = -message.linear.x ;
+  }
+  mode = monitor;
+  bag.close();
+  pthread_exit(NULL);
+}
+
+void CheckSceneInformation(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud) {
+  pcl::PointCloud<pcl::Normal> normals = GetNormals(pcl_cloud);
+  Eigen::Matrix3d scatter = CalcScatterMatrix(normals);
+  Eigen::Matrix3d m;
+  m << 1, 0, 0,
+       0, 1, 0,
+       0, 0, 1;
+  double condition = CalcConditionNumber(scatter);
+  cout << condition << endl;
+  if(condition < 5) {
+    actionlib_msgs::GoalID message;
+    message.id = "";
+    cancel_pub.publish(message);
+    mode = record;
+    vector<double> move1 = {0, 0, 0, 1, 0, 0, 0};
+    vector<double> move2 = {0, 0, 0, 0, 1, 0, 0};
+    moves.push_back(move2);
+    moves.push_back(move1);
+    bag.open("recorded_data.bag", rosbag::bagmode::Write);
+    pthread_t drive_thread;
+    int ret =  pthread_create(&drive_thread, NULL, &worker_thread, NULL);
+    if(ret != 0) {
+            printf("Error: pthread_create() failed\n");
+            exit(EXIT_FAILURE);
+    }
+    cout << "pthread created" << endl;
+  }
 }
 
 void RecordDepth(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud) {
-  
+  cout << "record" << endl;
+  sensor_msgs::PointCloud2 msg;
+  pcl::PCLPointCloud2 pcl_pc2;
+  pcl::toROSMsg(pcl_cloud, msg);
+  bag.write("camera/depth/points", ros::Time::now(), msg);
 }
 
 void DepthCb(sensor_msgs::PointCloud2 msg) {
@@ -176,14 +269,16 @@ void DepthCb(sensor_msgs::PointCloud2 msg) {
   // we've received I guess.
   TransformPointCloudQuat(pcl_cloud, current_pose);
   TransformPointCloudQuat(pcl_cloud, extrinsics);
-  
+  pcl_cloud = VoxelFilter(pcl_cloud);
   PublishCloud(pcl_cloud, cloud_pub_1);
   
   if(mode == monitor) {
     CheckGroundPlane(pcl_cloud);
   } else if(mode == find_scene) {
     CheckSceneInformation(pcl_cloud);
+    
   } else if (mode == record) {
+    
     RecordDepth(pcl_cloud);
   }
 }
@@ -216,6 +311,29 @@ void CommandCb(const std_msgs::String::ConstPtr& msg)
   }
 }
 
+void StatusCb(const actionlib_msgs::GoalStatusArray::ConstPtr& msg) {
+  if(mode == record) {
+    if(msg->status_list[msg->status_list.size() -1].status == 3) {
+      cout << "Activating Move" << endl;
+      sleep(10);
+      geometry_msgs::PoseStamped message;
+      vector<double> move = moves[0];
+      moves.erase(moves.begin());
+      message.pose.position.x = current_pose[4] + move[4];
+      message.pose.position.y = current_pose[5] + move[5];
+      message.pose.position.z = current_pose[6] + move[6];
+      message.pose.orientation.x = current_pose[0] + move[0];
+      message.pose.orientation.y = current_pose[1] + move[1];
+      message.pose.orientation.z = current_pose[2] + move[2];
+      message.pose.orientation.w = current_pose[3] + move[3];
+      message.header.stamp = ros::Time::now();
+      message.header.frame_id = "map";
+      move_pub.publish(message);
+    }
+    
+  }
+}
+
 int main(int argc, char **argv) {
   signal(SIGINT,HandleStop);
   signal(SIGALRM,HandleStop);
@@ -226,9 +344,13 @@ int main(int argc, char **argv) {
   calibration_error_pub = n.advertise<std_msgs::Float32MultiArray>("/calibration/calibration_error", 1000);
   cloud_pub_1 = n.advertise<sensor_msgs::PointCloud2> ("cloud_pub_1", 1);
   image_pub = n.advertise<sensor_msgs::Image> ("image_pub", 1);
+  cancel_pub = n.advertise<actionlib_msgs::GoalID> ("/explore_server/cancel", 1);
+  move_pub = n.advertise<geometry_msgs::PoseStamped> ("/move_base_simple/goal", 1);
+  velocity_pub = n.advertise<geometry_msgs::Twist> ("/mobile_base/commands/velocity", 1);
   ros::Subscriber depth_sub = n.subscribe("/camera/depth/points", 1, DepthCb);
   ros::Subscriber odom_sub = n.subscribe("/odom", 1, OdomCb);
   ros::Subscriber command_sub = n.subscribe("/calibration_commands", 1, CommandCb);
+  ros::Subscriber status_sub = n.subscribe("/move_base/status", 1, StatusCb);
   current_pose[0] = 0;
   current_pose[1] = 0;
   current_pose[2] = 0;

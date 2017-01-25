@@ -224,6 +224,10 @@ pcl::PointCloud<pcl::PointXYZ> VoxelFilter(
   const pcl::PointCloud<pcl::PointXYZ>&                                       
       cloud);
 
+pcl::PointCloud<pcl::PointXYZ> BrassVoxelFilter(
+  const pcl::PointCloud<pcl::PointXYZ>&                                       
+      cloud);
+
 pcl::PointCloud<pcl::Normal> GetNormals(
     const pcl::PointCloud<pcl::PointXYZ>& cloud);
 
@@ -269,6 +273,10 @@ void PlaneCorrections(
   vector<Eigen::Vector4d> k2_normal_equations,
   vector<ros::Publisher> publishers,
   double* transform);
+
+Eigen::Matrix3d CalcScatterMatrix(pcl::PointCloud<pcl::Normal> normals);
+
+double CalcConditionNumber(Eigen::Matrix3d mat1);
 
 void ICP(
   const int k,
