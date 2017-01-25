@@ -22,7 +22,7 @@ ros::Publisher image_pub;
 ros::Publisher cancel_pub;
 ros::Publisher move_pub;
 ros::Publisher velocity_pub;
-rosbag::Bag bag;
+rosbag::Bag rot_bag, trans_bag;
 using namespace icp;
 using namespace std;
 double extrinsics[7] = {0, 0, 0, 1, -.087, -.0125, .2870};
@@ -30,7 +30,7 @@ double current_pose[7];
 pcl::PointCloud<pcl::PointXYZ> global_cloud;
 double global_min;
 typedef actionlib::SimpleActionClient<frontier_exploration::ExploreTaskAction> Client;
-enum Mode{monitor, record, find_scene};
+enum Mode{monitor, record, record_rot, record_trans, find_scene};
 
 Mode mode = monitor;
 vector<vector<double> > moves;
@@ -187,25 +187,15 @@ void MakeMove(vector<double> move) {
   move_pub.publish(message);
 }
 
-void* worker_thread(void *arg) {
+void* full_turtlebot_record(void *arg) {
   geometry_msgs::Twist message;
   message.linear.x = 0;
   message.linear.y = 0;
   message.linear.z = 0;
   message.angular.x = 0;
   message.angular.y = 0;
-  message.angular.z = .2;
-  
-  for(int i = 0; i < 6; i++) {
-    for(int i = 0; i < 3; i++) {
-      cout << "Velocity published" << endl;
-      velocity_pub.publish(message);
-      sleep(3);
-    }
-    sleep(3);
-    message.angular.z = -message.angular.z;
-  }
   message.angular.z = 0;
+  
   message.linear.x = .2;
   for(int i = 0; i < 6; i++) {
     for(int i = 0; i < 1; i++) {
@@ -215,9 +205,24 @@ void* worker_thread(void *arg) {
     sleep(3);
     message.linear.x = -message.linear.x ;
   }
+  message.angular.z = .2;
+  message.linear.x = 0;
+  mode = record_rot;
+  for(int i = 0; i < 6; i++) {
+    for(int i = 0; i < 3; i++) {
+      cout << "Velocity published" << endl;
+      velocity_pub.publish(message);
+      sleep(3);
+    }
+    sleep(3);
+    message.angular.z = -message.angular.z;
+  }
   mode = monitor;
   bag.close();
   pthread_exit(NULL);
+}
+
+void CheckNormals() {
 }
 
 void CheckSceneInformation(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud) {
@@ -233,19 +238,22 @@ void CheckSceneInformation(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud) {
     actionlib_msgs::GoalID message;
     message.id = "";
     cancel_pub.publish(message);
-    mode = record;
+    mode = record_trans;
     vector<double> move1 = {0, 0, 0, 1, 0, 0, 0};
     vector<double> move2 = {0, 0, 0, 0, 1, 0, 0};
     moves.push_back(move2);
     moves.push_back(move1);
-    bag.open("recorded_data.bag", rosbag::bagmode::Write);
+    rot_bag.open("recorded_data_trans.bag", rosbag::bagmode::Write);
+    trans_bag.open("recorded_data_rot.bag", rosbag::bagmode::Write);
     pthread_t drive_thread;
-    int ret =  pthread_create(&drive_thread, NULL, &worker_thread, NULL);
+    int ret =  pthread_create(&drive_thread, NULL, &full_turtlebot_record, NULL);
     if(ret != 0) {
             printf("Error: pthread_create() failed\n");
             exit(EXIT_FAILURE);
     }
     cout << "pthread created" << endl;
+  } else {
+    CheckNormals();
   }
 }
 
@@ -254,7 +262,11 @@ void RecordDepth(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud) {
   sensor_msgs::PointCloud2 msg;
   pcl::PCLPointCloud2 pcl_pc2;
   pcl::toROSMsg(pcl_cloud, msg);
-  bag.write("camera/depth/points", ros::Time::now(), msg);
+  if(mode == record_rot) {
+    rot_bag.write("camera/depth/points", ros::Time::now(), msg);
+  } else if(mode == record_trans) {
+    trans_bag.write("camera/depth/points", ros::Time::now(), msg);
+  }
 }
 
 void DepthCb(sensor_msgs::PointCloud2 msg) {
@@ -267,6 +279,7 @@ void DepthCb(sensor_msgs::PointCloud2 msg) {
   // Pose will need to be adjusted based on robot position
   // I believe, so we'll need to save the most recent odometry message
   // we've received I guess.
+  pcl::PointCloud<pcl::PointXYZ> temp = pcl_cloud;
   TransformPointCloudQuat(pcl_cloud, current_pose);
   TransformPointCloudQuat(pcl_cloud, extrinsics);
   pcl_cloud = VoxelFilter(pcl_cloud);
@@ -275,10 +288,9 @@ void DepthCb(sensor_msgs::PointCloud2 msg) {
   if(mode == monitor) {
     CheckGroundPlane(pcl_cloud);
   } else if(mode == find_scene) {
-    CheckSceneInformation(pcl_cloud);
+    CheckSceneInformation(temp);
     
-  } else if (mode == record) {
-    
+  } else if (mode == record_rot || mode == record_trans) {
     RecordDepth(pcl_cloud);
   }
 }
