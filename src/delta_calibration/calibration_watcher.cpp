@@ -209,14 +209,13 @@ void* full_turtlebot_record(void *arg) {
     sleep(2);
     message.linear.x = -message.linear.x ;
   }
-  message.angular.z = .2;
+  message.angular.z = .5;
   message.linear.x = 0;
   mode = record_rot;
   for(int i = 0; i < num_passes; i++) {
-    for(int i = 0; i < num_passes; i++) {
+    for(int i = 0; i < 3; i++) {
       cout << "Velocity published" << endl;
       velocity_pub.publish(message);
-      sleep(3);
     }
     sleep(2);
     message.angular.z = -message.angular.z;
@@ -339,7 +338,7 @@ void CheckSceneInformation(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud) {
        0, 0, 1;
   double condition = CalcConditionNumber(scatter);
   cout << condition << endl;
-  if(condition < 5) {
+  if(condition < 15) {
     cout << "Full Record" << endl;
     SetAll();
     actionlib_msgs::GoalID message;
