@@ -22,9 +22,13 @@ ros::Publisher image_pub;
 ros::Publisher cancel_pub;
 ros::Publisher move_pub;
 ros::Publisher velocity_pub;
-rosbag::Bag rot_bag, trans_bag;
+rosbag::Bag rot_bag, trans_bag, find_bag;
+bool flag_stopped = true;
+bool x_orth, y_orth, z_orth = false;
+bool x_par, y_par, z_par = false;
 using namespace icp;
 using namespace std;
+int num_passes = 0;
 double extrinsics[7] = {0, 0, 0, 1, -.087, -.0125, .2870};
 double current_pose[7];
 pcl::PointCloud<pcl::PointXYZ> global_cloud;
@@ -197,32 +201,133 @@ void* full_turtlebot_record(void *arg) {
   message.angular.z = 0;
   
   message.linear.x = .2;
-  for(int i = 0; i < 6; i++) {
+  for(int i = 0; i < num_passes; i++) {
     for(int i = 0; i < 1; i++) {
       velocity_pub.publish(message);
       sleep(3);
     }
-    sleep(3);
+    sleep(2);
     message.linear.x = -message.linear.x ;
   }
   message.angular.z = .2;
   message.linear.x = 0;
   mode = record_rot;
-  for(int i = 0; i < 6; i++) {
-    for(int i = 0; i < 3; i++) {
+  for(int i = 0; i < num_passes; i++) {
+    for(int i = 0; i < num_passes; i++) {
       cout << "Velocity published" << endl;
       velocity_pub.publish(message);
       sleep(3);
     }
-    sleep(3);
+    sleep(2);
     message.angular.z = -message.angular.z;
   }
-  mode = monitor;
-  bag.close();
+//   rot_bag.close();
+//   trans_bag.close();
+  mode = find_scene;
   pthread_exit(NULL);
 }
 
-void CheckNormals() {
+
+bool DoubleEquals(double x, double y) {
+  return fabs(x-y) < .3;
+}
+
+void CheckNormals(pcl::PointCloud<pcl::Normal> normals) {
+  bool new_info = false;
+  Eigen::Vector3d x = {1, 0, 0};
+  Eigen::Vector3d y = {0, 1, 0};
+  Eigen::Vector3d z = {0, 0, 1};
+  int x_p_count = 0;
+  int y_p_count = 0;
+  int z_p_count = 0;
+  int x_o_count = 0;
+  int y_o_count = 0;
+  int z_o_count = 0;
+  for(size_t i = 0; i < normals.size(); i++){
+    Eigen::Vector3d normal = {normals[i].normal_x, normals[i].normal_y, normals[i].normal_z};
+    normal.normalize();
+    double x_dot = abs(normal.dot(x));
+    double y_dot = abs(normal.dot(y));
+    double z_dot = abs(normal.dot(z));
+    if(!DoubleEquals(x_dot, 0)) {
+      x_o_count += 1;
+    }
+    if(!DoubleEquals(x_dot, 1)) {
+      x_p_count += 1;
+    }
+    if(!DoubleEquals(y_dot, 0)) {
+      y_o_count += 1;
+    }
+    if(!DoubleEquals(y_dot, 1)) {
+      y_p_count += 1;
+    }
+    if(!DoubleEquals(z_dot, 0)) {
+      z_o_count += 1;
+    }
+    if(!DoubleEquals(z_dot, 1)) {
+      z_p_count += 1;
+    }
+  }
+  if(!x_orth && x_o_count > 5000) {
+    new_info = true;
+    x_orth = true;
+  }
+  if(!y_orth && y_o_count > 5000) {
+    new_info = true;
+    y_orth = true;
+  }
+  if(!z_orth && z_o_count > 5000) {
+    new_info = true;
+    z_orth = true;
+  }
+  if(!x_par && x_p_count > 5000) {
+    new_info = true;
+    x_par = true;
+  }
+  if(!y_par && y_p_count > 5000) {
+    new_info = true;
+    y_par = true;
+  }
+  if(!z_par && z_p_count > 5000) {
+    new_info = true;
+    z_par = true;
+  }
+  cout << "x_o_count: " << x_o_count << endl;
+  cout << "y_o_count: " << y_o_count << endl;
+  cout << "z_o_count: " << z_o_count << endl;
+  cout << "x_p_count: " << x_p_count << endl;
+  cout << "y_p_count: " << y_p_count << endl;
+  cout << "z_p_count: " << z_p_count << endl;
+  if(new_info) {
+    flag_stopped= true;
+    actionlib_msgs::GoalID message;
+    message.id = "";
+    cancel_pub.publish(message);
+    mode = record_trans;
+    pthread_t drive_thread;
+    num_passes = 2;
+    int ret =  pthread_create(&drive_thread, NULL, &full_turtlebot_record, NULL);
+    if(ret != 0) {
+            printf("Error: pthread_create() failed\n");
+            exit(EXIT_FAILURE);
+    }
+  }
+}
+
+bool AllInfo() {
+  return x_orth && y_orth && z_orth && x_par && y_par && z_par;
+}
+
+void UnsetInfo() {
+  rot_bag.open("recorded_data_rot.bag", rosbag::bagmode::Write);
+  trans_bag.open("recorded_data_trans.bag", rosbag::bagmode::Write);
+  rot_bag.close();
+  trans_bag.close();
+  x_orth = y_orth = z_orth = x_par = y_par = z_par = false;
+}
+
+void SetAll() {
+  x_orth = y_orth = z_orth = x_par = y_par = z_par = true;
 }
 
 void CheckSceneInformation(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud) {
@@ -235,17 +340,16 @@ void CheckSceneInformation(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud) {
   double condition = CalcConditionNumber(scatter);
   cout << condition << endl;
   if(condition < 5) {
+    cout << "Full Record" << endl;
+    SetAll();
     actionlib_msgs::GoalID message;
     message.id = "";
     cancel_pub.publish(message);
     mode = record_trans;
-    vector<double> move1 = {0, 0, 0, 1, 0, 0, 0};
-    vector<double> move2 = {0, 0, 0, 0, 1, 0, 0};
-    moves.push_back(move2);
-    moves.push_back(move1);
-    rot_bag.open("recorded_data_trans.bag", rosbag::bagmode::Write);
-    trans_bag.open("recorded_data_rot.bag", rosbag::bagmode::Write);
+    rot_bag.open("recorded_data_rot.bag", rosbag::bagmode::Write);
+    trans_bag.open("recorded_data_trans.bag", rosbag::bagmode::Write);
     pthread_t drive_thread;
+    num_passes = 5;
     int ret =  pthread_create(&drive_thread, NULL, &full_turtlebot_record, NULL);
     if(ret != 0) {
             printf("Error: pthread_create() failed\n");
@@ -253,12 +357,14 @@ void CheckSceneInformation(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud) {
     }
     cout << "pthread created" << endl;
   } else {
-    CheckNormals();
+    cout << "Partial Record" << endl;
+    rot_bag.open("recorded_data_rot.bag", rosbag::bagmode::Append);
+    trans_bag.open("recorded_data_trans.bag", rosbag::bagmode::Append);
+    CheckNormals(normals);
   }
 }
 
 void RecordDepth(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud) {
-  cout << "record" << endl;
   sensor_msgs::PointCloud2 msg;
   pcl::PCLPointCloud2 pcl_pc2;
   pcl::toROSMsg(pcl_cloud, msg);
@@ -268,6 +374,20 @@ void RecordDepth(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud) {
     trans_bag.write("camera/depth/points", ros::Time::now(), msg);
   }
 }
+
+void RecordOdom(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud) {
+//   cout << "record" << endl;
+//   sensor_msgs::PointCloud2 msg;
+//   pcl::PCLPointCloud2 pcl_pc2;
+//   pcl::toROSMsg(pcl_cloud, msg);
+//   if(mode == record_rot) {
+//     rot_bag.write("camera/depth/points", ros::Time::now(), msg);
+//   } else if(mode == record_trans) {
+//     trans_bag.write("camera/depth/points", ros::Time::now(), msg);
+//   }
+}
+
+
 
 void DepthCb(sensor_msgs::PointCloud2 msg) {
   pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
@@ -288,8 +408,29 @@ void DepthCb(sensor_msgs::PointCloud2 msg) {
   if(mode == monitor) {
     CheckGroundPlane(pcl_cloud);
   } else if(mode == find_scene) {
-    CheckSceneInformation(temp);
-    
+    if(!AllInfo()) {
+      if(flag_stopped == true) {
+        flag_stopped = false;
+        Client client("explore_server", true);
+        client.waitForServer();
+        frontier_exploration::ExploreTaskGoal goal;
+        goal.explore_center.point.x = 0;
+        goal.explore_center.point.y = 0;
+        goal.explore_center.point.z = 0;
+        goal.explore_center.header.frame_id = "map";
+        goal.explore_boundary.header.frame_id = "map";
+        client.sendGoal(goal);
+      }
+      if(rot_bag.getMode()) {
+        rot_bag.close();
+        trans_bag.close();
+      }
+      CheckSceneInformation(pcl_cloud);
+    } else {
+      // Calibrate here
+//       UnsetInfo();
+      mode = monitor;
+    }
   } else if (mode == record_rot || mode == record_trans) {
     RecordDepth(pcl_cloud);
   }
@@ -303,6 +444,9 @@ void OdomCb(const nav_msgs::Odometry& msg) {
   current_pose[4] = msg.pose.pose.position.x;
   current_pose[5] = msg.pose.pose.position.y;
   current_pose[6] = msg.pose.pose.position.z;
+  if(mode == record_rot || mode == record_trans) {
+//     RecordOdom(msg);
+  }
 }
 
 void CommandCb(const std_msgs::String::ConstPtr& msg)
@@ -311,6 +455,7 @@ void CommandCb(const std_msgs::String::ConstPtr& msg)
   string scene_find = "find_scene";
   if(scene_find.compare(msg->data.c_str()) == 0) {
     mode = find_scene;
+    flag_stopped = false;
     Client client("explore_server", true);
     client.waitForServer();
     frontier_exploration::ExploreTaskGoal goal;
@@ -352,6 +497,10 @@ int main(int argc, char **argv) {
   ros::init(argc, argv, "calibration_watcher");
 
   ros::NodeHandle n;
+  rot_bag.open("recorded_data_rot.bag", rosbag::bagmode::Write);
+  trans_bag.open("recorded_data_trans.bag", rosbag::bagmode::Write);
+  rot_bag.close();
+  trans_bag.close();
   ground_error_pub = n.advertise<std_msgs::Float32>("/calibration/ground_plane_error", 1000);
   calibration_error_pub = n.advertise<std_msgs::Float32MultiArray>("/calibration/calibration_error", 1000);
   cloud_pub_1 = n.advertise<sensor_msgs::PointCloud2> ("cloud_pub_1", 1);
