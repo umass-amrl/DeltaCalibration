@@ -374,16 +374,12 @@ void RecordDepth(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud) {
   }
 }
 
-void RecordOdom(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud) {
-//   cout << "record" << endl;
-//   sensor_msgs::PointCloud2 msg;
-//   pcl::PCLPointCloud2 pcl_pc2;
-//   pcl::toROSMsg(pcl_cloud, msg);
-//   if(mode == record_rot) {
-//     rot_bag.write("camera/depth/points", ros::Time::now(), msg);
-//   } else if(mode == record_trans) {
-//     trans_bag.write("camera/depth/points", ros::Time::now(), msg);
-//   }
+void RecordOdom(const nav_msgs::Odometry& msg) {
+  if(mode == record_rot) {
+      rot_bag.write("/odom", ros::Time::now(), msg);
+    } else if(mode == record_trans) {
+      trans_bag.write("/odom", ros::Time::now(), msg);
+    }
 }
 
 
@@ -444,7 +440,7 @@ void OdomCb(const nav_msgs::Odometry& msg) {
   current_pose[5] = msg.pose.pose.position.y;
   current_pose[6] = msg.pose.pose.position.z;
   if(mode == record_rot || mode == record_trans) {
-//     RecordOdom(msg);
+    RecordOdom(msg);
   }
 }
 
