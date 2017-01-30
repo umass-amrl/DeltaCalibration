@@ -226,6 +226,44 @@ void* full_turtlebot_record(void *arg) {
   pthread_exit(NULL);
 }
 
+void* part_turtlebot_record(void *arg) {
+  geometry_msgs::Twist message;
+  message.linear.x = 0;
+  message.linear.y = 0;
+  message.linear.z = 0;
+  message.angular.x = 0;
+  message.angular.y = 0;
+  message.angular.z = 0;
+  
+  message.angular.z = .5;
+  message.linear.x = 0;
+  mode = record_rot;
+  for(int i = 0; i < num_passes; i++) {
+    for(int i = 0; i < 5; i++) {
+      cout << "Velocity published" << endl;
+      velocity_pub.publish(message);
+    }
+    sleep(2);
+    message.angular.z = -message.angular.z;
+  }
+  mode = record_trans;
+  message.angular.z = 0;
+  message.linear.x = .2;
+  for(int i = 0; i < num_passes; i++) {
+    for(int i = 0; i < 1; i++) {
+      velocity_pub.publish(message);
+      sleep(3);
+    }
+    sleep(2);
+    message.linear.x = -message.linear.x ;
+  }
+  
+  
+//   rot_bag.close();
+//   trans_bag.close();
+  mode = find_scene;
+  pthread_exit(NULL);
+}
 
 bool DoubleEquals(double x, double y) {
   return fabs(x-y) < .3;
