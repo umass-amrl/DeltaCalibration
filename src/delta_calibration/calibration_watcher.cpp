@@ -387,6 +387,7 @@ pcl::PointCloud<pcl::PointXYZ> CutCloud(pcl::PointCloud<pcl::PointXYZ> cloud) {
   for(size_t i = 0; i < cloud.size(); ++i) {
     if(cloud[i].x < 2) {
       return_cloud.points.push_back(cloud[i]);
+    } else {
     }
   }
   return return_cloud;
@@ -397,8 +398,8 @@ void DepthCb(sensor_msgs::PointCloud2 msg) {
   pcl::PCLPointCloud2 pcl_pc2;
   pcl_conversions::toPCL(msg,pcl_pc2);
   pcl::fromPCLPointCloud2(pcl_pc2,pcl_cloud);
-  pcl_cloud = CutCloud(pcl_cloud);
   OrientCloud(&pcl_cloud);
+  pcl_cloud = CutCloud(pcl_cloud);
   // Pose will need to be adjusted based on robot position
   // I believe, so we'll need to save the most recent odometry message
   // we've received I guess.
@@ -414,14 +415,15 @@ void DepthCb(sensor_msgs::PointCloud2 msg) {
     if(!AllInfo()) {
       if(flag_stopped == true) {
         flag_stopped = false;
+	cout << "starting explore" << endl;
         Client client("explore_server", true);
         client.waitForServer();
         frontier_exploration::ExploreTaskGoal goal;
         goal.explore_center.point.x = 0;
         goal.explore_center.point.y = 0;
         goal.explore_center.point.z = 0;
-        goal.explore_center.header.frame_id = "map";
-        goal.explore_boundary.header.frame_id = "map";
+        goal.explore_center.header.frame_id = "/odom";
+        goal.explore_boundary.header.frame_id = "/odom";
         client.sendGoal(goal);
       }
       if(rot_bag.getMode()) {
@@ -465,8 +467,8 @@ void CommandCb(const std_msgs::String::ConstPtr& msg)
     goal.explore_center.point.x = 0;
     goal.explore_center.point.y = 0;
     goal.explore_center.point.z = 0;
-    goal.explore_center.header.frame_id = "map";
-    goal.explore_boundary.header.frame_id = "map";
+    goal.explore_center.header.frame_id = "/odom";
+    goal.explore_boundary.header.frame_id = "/odom";
     client.sendGoal(goal);
   }
 }

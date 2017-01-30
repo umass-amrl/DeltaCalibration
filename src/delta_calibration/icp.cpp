@@ -32,7 +32,7 @@ void PublishCloud(
   pcl::PCLPointCloud2 pcl_cloud;
   pcl::toPCLPointCloud2(cloud, pcl_cloud);
   pcl_conversions::fromPCL(pcl_cloud, temp_cloud);
-  temp_cloud.header.frame_id = "map";
+  temp_cloud.header.frame_id = "/odom";
   publisher.publish(temp_cloud);
 }
 
