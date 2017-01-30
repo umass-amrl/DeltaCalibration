@@ -213,7 +213,7 @@ void* full_turtlebot_record(void *arg) {
   message.linear.x = 0;
   mode = record_rot;
   for(int i = 0; i < num_passes; i++) {
-    for(int i = 0; i < 3; i++) {
+    for(int i = 0; i < 5; i++) {
       cout << "Velocity published" << endl;
       velocity_pub.publish(message);
     }
@@ -267,27 +267,27 @@ void CheckNormals(pcl::PointCloud<pcl::Normal> normals) {
       z_p_count += 1;
     }
   }
-  if(!x_orth && x_o_count > 5000) {
+  if(!x_orth && x_o_count > 10000) {
     new_info = true;
     x_orth = true;
   }
-  if(!y_orth && y_o_count > 5000) {
+  if(!y_orth && y_o_count > 10000) {
     new_info = true;
     y_orth = true;
   }
-  if(!z_orth && z_o_count > 5000) {
+  if(!z_orth && z_o_count > 10000) {
     new_info = true;
     z_orth = true;
   }
-  if(!x_par && x_p_count > 5000) {
+  if(!x_par && x_p_count > 10000) {
     new_info = true;
     x_par = true;
   }
-  if(!y_par && y_p_count > 5000) {
+  if(!y_par && y_p_count > 10000) {
     new_info = true;
     y_par = true;
   }
-  if(!z_par && z_p_count > 5000) {
+  if(!z_par && z_p_count > 10000) {
     new_info = true;
     z_par = true;
   }
@@ -382,14 +382,22 @@ void RecordOdom(const nav_msgs::Odometry& msg) {
     }
 }
 
-
+pcl::PointCloud<pcl::PointXYZ> CutCloud(pcl::PointCloud<pcl::PointXYZ> cloud) {
+  pcl::PointCloud<pcl::PointXYZ> return_cloud;
+  for(size_t i = 0; i < cloud.size(); ++i) {
+    if(cloud[i].x < 2) {
+      return_cloud.points.push_back(cloud[i]);
+    }
+  }
+  return return_cloud;
+}
 
 void DepthCb(sensor_msgs::PointCloud2 msg) {
   pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
   pcl::PCLPointCloud2 pcl_pc2;
   pcl_conversions::toPCL(msg,pcl_pc2);
   pcl::fromPCLPointCloud2(pcl_pc2,pcl_cloud);
-  
+  pcl_cloud = CutCloud(pcl_cloud);
   OrientCloud(&pcl_cloud);
   // Pose will need to be adjusted based on robot position
   // I believe, so we'll need to save the most recent odometry message
