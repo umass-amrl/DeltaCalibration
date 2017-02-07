@@ -1,4 +1,4 @@
-function [t_err, r_err] = genTestTurtlebotCal(N,angle,noise)
+function [t_err, r_err] = genTestPartialCal(N,angle,noise)
 clc;
 A = RandomTransform6D(3.14159, .5)';
 
@@ -14,9 +14,10 @@ A2 = [];
 A2I = [];
 A1T = [];
 A2T = [];
+U = [];
 for i=1:N
   Ar = RandomZAxisRotate(max_delta_angle, 0)';
-%   A1 = [A1; RandomZAxisRotate(max_delta_angle, 0)'];
+  %A1 = [A1; RandomZAxisRotate(max_delta_angle, 0)'];
   At = RandomGroundTranslation6D(0, max_delta_translation)';
   A1 = [A1; Ar];
   A1T = [A1T; At];
@@ -37,7 +38,7 @@ A1
 A2
 A1T
 A2T
-A_cal = calibrate_turtlebot(C0, C1)
+A_cal = calibrate_partial_data(C0, U)
 A
 q = aa2quat(A');
 fprintf('\n %f degrees about [%f %f %f]\n\n',...
@@ -45,8 +46,8 @@ fprintf('\n %f degrees about [%f %f %f]\n\n',...
         q(2:4) / norm(q(2:4)));
 % Compute angular error
 error_aa = rotm2aa(inv(aa2rotm(A(1:3)')) * aa2rotm(A_cal(1:3)'))
-[thetax, thetay, thetaz] = rotm2eulerangles(inv(aa2rotm(A(1:3)')))
-[thetaxt, thetayt, thetazt] = rotm2eulerangles(aa2rotm(A_cal(1:3)'))
+% [thetax, thetay, thetaz] = rotm2eulerangles(inv(aa2rotm(A(1:3)')))
+% [thetaxt, thetayt, thetazt] = rotm2eulerangles(aa2rotm(A_cal(1:3)'))
 r_err = norm(error_aa) / pi * 180
 
 % Compute translation error
