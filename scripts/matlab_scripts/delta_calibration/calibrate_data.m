@@ -1,5 +1,5 @@
 
-function trans = calibrate(file)
+function trans = calibrate(C0)
 clc;
 testa = [];
 testax = [];
@@ -30,11 +30,7 @@ switch 9
   case 10
     dataset = 'wide_horz_long';
 end
-%dataset = strcat(file, '_', int2str(5))
-dataset = file
-fprintf('Using dataset %s\n\n', file);
 
-C0 = dlmread(strcat(dataset, '.pose'), '\t');
 %%C1 = dlmread(strcat('data/', dataset, '_2.pose'));
 
 % Make sure the trajectories have the same number of data points.
@@ -223,11 +219,11 @@ trans = [Raa T'];
 %axisDiff = bsxfun(@minus,cTotal(2:end, :),Raa/norm(Raa)); 
 %axisDiff_Norm = sqrt(sum(abs(axisDiff).^2,2))
 axisDiff_Norm = cTotal(2:end, :);    
-file;
-fileID = fopen(strcat(file, '.txt'),'w');
-fprintf(fileID, '%f ', Raa);
-fprintf(fileID, '%f ', T);
-fprintf('T:\n');
-disp(T)
+% file;
+% fileID = fopen(strcat(file, '.txt'),'w');
+% fprintf(fileID, '%f ', Raa);
+% fprintf(fileID, '%f ', T);
+% fprintf('T:\n');
+% disp(T)
 
 

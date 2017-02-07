@@ -11,8 +11,8 @@ namespace icp {
 
 bool first_nn = true;
 int count = 0;
-const float nn_dist = .05;
-float neighbor_dist = .05;
+const float nn_dist = .01;
+float neighbor_dist = .01;
 vector<int> x_pos;
 vector<int> y_pos;
 
@@ -32,7 +32,7 @@ void PublishCloud(
   pcl::PCLPointCloud2 pcl_cloud;
   pcl::toPCLPointCloud2(cloud, pcl_cloud);
   pcl_conversions::fromPCL(pcl_cloud, temp_cloud);
-  temp_cloud.header.frame_id = "/odom";
+  temp_cloud.header.frame_id = "point_cloud";
   publisher.publish(temp_cloud);
 }
 
@@ -408,7 +408,7 @@ double KdTreeNN(
         nearest_neigbors_temp[i] = neighbor.index;
         start_points_temp[i] = transform_points[i].index;
         dists[i] = dist;
-        //mean += error;
+        mean += dist;
       }
       else{
         dists[i] = 9999;
@@ -478,7 +478,7 @@ double KdTreeNN(
     }
   }
     first_nn = false;
-    return mean / transform_points.size();
+    return mean / nearest_neigbors.size();
 }
 
 void WritePose(double* pose, ofstream file) {

@@ -14,4 +14,5 @@ function A2 = A1toA2(A,A1)
   t2 = inv(r_m) * (r1_m * t + t1 - t);
   r2_aa = quat2aa(rotm2quat(r2_m));
   A2 = [r2_aa t2'];
+  A2 = [A2 0 0]
 end
