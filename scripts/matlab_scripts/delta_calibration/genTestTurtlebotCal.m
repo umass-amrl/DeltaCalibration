@@ -1,7 +1,7 @@
 function [t_err, r_err] = genTestTurtlebotCal(N,angle,noise)
 clc;
 A = RandomTransform6D(3.14159, .5)';
-
+A = [.02 .01 .05 1 1 0 0 0];
 %N = 10;
 max_delta_angle = angle / 180 * pi;
 max_delta_translation = 0.2;
