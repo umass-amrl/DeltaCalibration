@@ -30,24 +30,24 @@ end
 
 %% ===========================================
 % Test Calibration Math with generated data.
-C0 = [A1 A2];
+C0 = [A1 A2]
 C1 = [A1T A2T];
 size(C0);
-A1
-A2
-A1T
-A2T
-A_cal = calibrate_turtlebot(C0, C1)
-A
-q = aa2quat(A');
-fprintf('\n %f degrees about [%f %f %f]\n\n',...
-        180 / pi * 2.0 * acos(q(1)),...
-        q(2:4) / norm(q(2:4)));
+% A1
+% A2
+% A1T
+% A2T
+% A_cal = calibrate_turtlebot(C0, C1)
+% A
+% q = aa2quat(A');
+% fprintf('\n %f degrees about [%f %f %f]\n\n',...
+%         180 / pi * 2.0 * acos(q(1)),...
+%         q(2:4) / norm(q(2:4)));
 % Compute angular error
-error_aa = rotm2aa(inv(aa2rotm(A(1:3)')) * aa2rotm(A_cal(1:3)'))
-[thetax, thetay, thetaz] = rotm2eulerangles(inv(aa2rotm(A(1:3)')))
-[thetaxt, thetayt, thetazt] = rotm2eulerangles(aa2rotm(A_cal(1:3)'))
-r_err = norm(error_aa) / pi * 180
-
-% Compute translation error
-t_err = norm(A(4:6) - A_cal(4:6))
+% error_aa = rotm2aa(inv(aa2rotm(A(1:3)')) * aa2rotm(A_cal(1:3)'))
+% [thetax, thetay, thetaz] = rotm2eulerangles(inv(aa2rotm(A(1:3)')))
+% [thetaxt, thetayt, thetazt] = rotm2eulerangles(aa2rotm(A_cal(1:3)'))
+% r_err = norm(error_aa) / pi * 180
+% 
+% % Compute translation error
+% t_err = norm(A(4:6) - A_cal(4:6))

@@ -1,7 +1,7 @@
 function [t_err, r_err] = genTestPartialCal(N,angle,noise)
 clc;
 A = RandomTransform6D(3.14159, .5)';
-
+% A = [0 0 1.5 0 0 0 0 0];
 %N = 10;
 max_delta_angle = angle / 180 * pi;
 max_delta_translation = 0.2;
@@ -16,15 +16,10 @@ A1T = [];
 A2T = [];
 U = [];
 for i=1:N
-  Ar = RandomZAxisRotate(max_delta_angle, 0)';
-  %A1 = [A1; RandomZAxisRotate(max_delta_angle, 0)'];
-  At = RandomGroundTranslation6D(0, max_delta_translation)';
-  A1 = [A1; Ar];
-  A1T = [A1T; At];
+  A1 = [A1; RandomTransform6D(max_delta_angle, max_delta_translation)'];
   %A1(end,:) = AddNoiseToTransform6D(A1(end,:)', noise_angular, noise_translation)';
   A1I = [A1I; InverseTransform6D(A1(i,:)')];
-  A2 = [A2; A1toA2(A', Ar')];
-  A2T = [A2T; A1toA2(A', At')];
+  A2 = [A2; A1toA2(A', A1(i,:)')];
   %A2(end,:) = AddNoiseToTransform6D(A2(end,:)', noise_angular, noise_translation)';
   A2I = [A2I; InverseTransform6D(A2(i,:)')];
 end
@@ -32,13 +27,9 @@ end
 %% ===========================================
 % Test Calibration Math with generated data.
 C0 = [A1 A2];
-C1 = [A1T A2T];
+dlmwrite('generated_deltas.txt', C0, ' ');
 size(C0);
-A1
-A2
-A1T
-A2T
-A_cal = calibrate_partial_data(C0, U)
+A_cal = calibrate_data(C0)
 A
 q = aa2quat(A');
 fprintf('\n %f degrees about [%f %f %f]\n\n',...
