@@ -34,6 +34,23 @@ TARGET_LINK_LIBRARIES(${target}
     fspf_library
     ${OpenCV_LIBRARIES} ${libs})
     
+SET(target partial_calibrate)
+ROSBUILD_ADD_EXECUTABLE(${target}
+    icp.cpp
+    partial_calibrate.cpp
+    ../perception_tools/kdtree.cpp)
+ADD_DEPENDENCIES(${target}
+    ceres
+    shared_libraries
+    fspf_library
+    perception_library
+    ${OpenCV_LIBRARIES})
+TARGET_LINK_LIBRARIES(${target}
+    ceres
+    shared_libraries 
+    fspf_library
+    ${OpenCV_LIBRARIES} ${libs})
+    
 # SET(target test_normals)
 # ROSBUILD_ADD_EXECUTABLE(${target}
 #     test_normals.cpp

@@ -36,7 +36,10 @@ void PrintPose(double* pose){
 
 void ReadDeltasFromFile(string delta_file,
                         vector<vector<double> >* deltas_1,
-                        vector<vector<double> >* deltas_2) { 
+                        vector<vector<double> >* deltas_2,
+                        vector<vector<double> >* uncertainty_1,
+                        vector<vector<double> >* uncertainty_2
+                       ) { 
   cout << " reading" << endl;
   std::ifstream infile(delta_file.c_str());
   std::string line;
@@ -45,8 +48,18 @@ void ReadDeltasFromFile(string delta_file,
   while (std::getline(infile, line)) {
     vector<double> delta;
     vector<double> delta2;
+    vector<double> u;
+    vector<double> u2;
     delta.resize(8);
     delta2.resize(8);
+    u.resize(3);
+    u2.resize(3);
+    u[0] = 0;
+    u[1] = 0;
+    u[2] = 0;
+    u2[0] = 0;
+    u2[1] = 0;
+    u2[2] = 0;
     std::istringstream iss(line);
     double x, y, x1, y1;
     if (!(iss >> delta[0] >> delta[1] >> delta[2] >> delta[3] >> delta[4] >> delta[5] >> x >> y
@@ -55,6 +68,8 @@ void ReadDeltasFromFile(string delta_file,
       break; } // error
     deltas_1->push_back(delta);
     deltas_2->push_back(delta2);
+    uncertainty_1->push_back(u);
+    uncertainty_2->push_back(u2);
   }
 }
 
@@ -71,70 +86,49 @@ template <class T> Eigen::Transform<T, 3, Eigen::Affine> AAToTransform(T x, T y,
     return rotation;
 }
 
-// struct PartialRotationError {
-//   PartialRotationError(const vector<double>& delta_1,
-//                        const vector<double>& delta_2) :
-//       delta_1(delta_1),
-//       delta_2(delta_2) {}
-// 
-//   template <class T>
-//   bool operator()(const T* const camera,
-//                   T* residuals) const {
-//       
-// //     // Transform point_1 to the base reference frame by applying the camera tf.
-// //     const Eigen::Matrix<T, 3, 1> point_1_transformed =
-// //         TransformPoint<T>(point_1.cast<T>(), camera);
-// //     // Transform normal_1 to the base reference frame by applying the camera tf.
-// //     const Eigen::Matrix<T, 3, 1> normal_1_transformed =
-// //         TransformVector<T>(normal_1.cast<T>(), camera);
-// //     // The error is the difference between the predicted and observed position.
-//                     
-//     Eigen::Transform<T, 3, Eigen::Affine> q = 
-//         AAToTransform(camera[0], camera[1], camera[2]);
-//     Eigen::Transform<T, 3, Eigen::Affine> q1 = 
-//         AAToTransform(T(delta_1[0]), T(delta_1[1]), T(delta_1[2]));
-//     Eigen::Transform<T, 3, Eigen::Affine> q2 = 
-//         AAToTransform(T(delta_2[0]), T(delta_2[1]), T(delta_2[2]));
-//     
-//     Eigen::Transform<T, 3, Eigen::Affine> left;
-//     left = q1 * q;
-//     Eigen::Transform<T, 3, Eigen::Affine> right;
-//     right = q * q2;
-//     Eigen::Transform<T, 3, Eigen::Affine> error_transform;
-//     error_transform = left.inverse() * right;
-//     
-//     // Find the rotation component
-//     // Find the angle axis format
-//     Eigen::AngleAxis<T> angle_axis(error_transform.rotation());
-//   
-//     // Get the axis
-//     Eigen::Matrix<T, 3, 1> normal_axis = angle_axis.axis();
-//     
-//     // Recompute the rotation angle
-//     T combined_angle = angle_axis.angle();
-//     Eigen::Matrix<T, 3, 1> combined_axis = normal_axis * combined_angle;
-//     
-//     residuals[0] = combined_axis.norm();
-//     return true;
-//   }
-// 
-//   // Factory to hide the construction of the CostFunction object from
-//   // the client code.
-//   static ceres::CostFunction* Create(const vector<double>& delta_1,
-//                                      const vector<double>& delta_2) {
-//     return (new ceres::AutoDiffCostFunction<PartialRotationError, 1, 6>(
-//             new PartialRotationError(delta_1, delta_2)));
-//   }
-// 
-//  const vector<double> delta_1;
-//  const vector<double> delta_2;
-// };
+
+Eigen::Transform<double, 3, Eigen::Affine> TransformUncertainty(
+    Eigen::Transform<double, 3, Eigen::Affine> q,
+    Eigen::Transform<double, 3, Eigen::Affine> r,
+    const vector<double>& u) {
+  
+  Eigen::Transform<double, 3, Eigen::Affine> UncertainRotation;
+  
+  Eigen::Quaternion<double> q_q;
+  q_q = q.rotation();
+  Eigen::Quaternion<double> r_q;
+  r_q = r.rotation();
+  Eigen::Vector3d q_q_v;
+  q_q_v << q_q.x(), q_q.y(), q_q.z();
+  Eigen::Vector3d r_q_v;
+  r_q_v << r_q.x(), r_q.y(), r_q.z();
+  Eigen::Vector3d u_v;
+  u_v << u[0], u[1], u[2];
+  if(u_v.norm() != 0) {
+    u_v.normalize();
+    Eigen::Vector3d temp = q_q * r_q_v;
+    double mag = temp.dot(u_v);
+    Eigen::Vector3d axis = mag * u_v;
+    Eigen::Quaternion<double> uncertain_q(axis[0], axis[1],axis[2],q_q.w());
+    UncertainRotation = uncertain_q;
+  } else{
+    Eigen::Quaternion<double> uncertain_q(0,0,0,0);
+    UncertainRotation = uncertain_q;
+  }
+  
+  return UncertainRotation;
+}
 
 struct PartialRotationErrorNumeric {
   PartialRotationErrorNumeric(const vector<double>& delta_1,
-                       const vector<double>& delta_2) :
+                       const vector<double>& delta_2,
+                       const vector<double>& u1,
+                       const vector<double>& u2
+                             ) :
       delta_1(delta_1),
-      delta_2(delta_2) {}
+      delta_2(delta_2),
+      u1(u1),
+      u2(u2){}
 
   bool operator()(const double* const camera,
                   double* residuals) const {
@@ -146,10 +140,13 @@ struct PartialRotationErrorNumeric {
     Eigen::Transform<double, 3, Eigen::Affine> q2 = 
         AAToTransform(double(delta_2[0]), double(delta_2[1]), double(delta_2[2]));
     
+    Eigen::Transform<double, 3, Eigen::Affine> v1 = TransformUncertainty(q.inverse(), q1, u2);    
+    Eigen::Transform<double, 3, Eigen::Affine> v2 = TransformUncertainty(q, q2, u1); 
+    
     Eigen::Transform<double, 3, Eigen::Affine> left;
-    left = q1 * q;
+    left = q1 * q * v1.inverse();
     Eigen::Transform<double, 3, Eigen::Affine> right;
-    right = q * q2;
+    right = v2.inverse() * q * q2;
     Eigen::Transform<double, 3, Eigen::Affine> error_transform;
     error_transform = left.inverse() * right;
     
@@ -170,21 +167,30 @@ struct PartialRotationErrorNumeric {
   // Factory to hide the construction of the CostFunction object from
   // the client code.
   static ceres::CostFunction* Create(const vector<double>& delta_1,
-                                     const vector<double>& delta_2) {
+                                     const vector<double>& delta_2,
+                                     const vector<double>& u1,
+                                     const vector<double>& u2
+                                    ) {
     return (new ceres::NumericDiffCostFunction<PartialRotationErrorNumeric, 
             ceres::CENTRAL, 1, 6>(
-            new PartialRotationErrorNumeric(delta_1, delta_2)));
+            new PartialRotationErrorNumeric(delta_1, delta_2, u1, u2)));
   }
 
  const vector<double> delta_1;
  const vector<double> delta_2;
+ const vector<double> u1;
+ const vector<double> u2;
 };
 
 struct PartialTranslationErrorNumeric {
   PartialTranslationErrorNumeric(const vector<double>& delta_1,
-                       const vector<double>& delta_2) :
+                       const vector<double>& delta_2,
+                       const vector<double>& u1,
+                       const vector<double>& u2) :
       delta_1(delta_1),
-      delta_2(delta_2) {}
+      delta_2(delta_2),
+      u1(u1),
+      u2(u2){}
 
   bool operator()(const double* const camera,
                   double* residuals) const {
@@ -193,8 +199,6 @@ struct PartialTranslationErrorNumeric {
         AAToTransform(camera[0], camera[1], camera[2]);
     Eigen::Transform<double, 3, Eigen::Affine> q1 = 
         AAToTransform(double(delta_1[0]), double(delta_1[1]), double(delta_1[2]));
-    Eigen::Transform<double, 3, Eigen::Affine> q2 = 
-        AAToTransform(double(delta_2[0]), double(delta_2[1]), double(delta_2[2]));
     
     Eigen::Vector3d t1;
     Eigen::Vector3d t2;
@@ -202,10 +206,24 @@ struct PartialTranslationErrorNumeric {
     t1 << delta_1[3], delta_1[4], delta_1[5];
     t2 << delta_2[3], delta_2[4], delta_2[5];
     T << camera[3], camera[4], camera[5];
+    
+    Eigen::Vector3d u1_v;
+    u1_v << u1[0], u1[1], u1[2];
+    Eigen::Vector3d u2_v;
+    u2_v << u2[0], u2[1], u2[2];
+    
+    // Vector projections for partials based on uncertainty
+    
+    Eigen::Vector3d l_u1 = (q1 * T).dot(u1_v) * u1_v;
+    Eigen::Vector3d l_u2 = (q1 * T).dot(q * u2_v) * u2_v;
+    Eigen::Vector3d r_u1 = (q * t2).dot(u1_v) * u1_v;
+    Eigen::Vector3d r_u2 = t1.dot(q * u2_v) * u2_v;
+    
+    
     Eigen::Vector3d left;
-    left = q * t2 + T;
+    left = T - (q1 * T) - l_u1 - l_u2;
     Eigen::Vector3d right;
-    right = q1 * T + t1;
+    right = t1 - (q * t2) + r_u1 - r_u2;
     
     Eigen::Vector3d error_vector = left - right;
     
@@ -216,22 +234,29 @@ struct PartialTranslationErrorNumeric {
   // Factory to hide the construction of the CostFunction object from
   // the client code.
   static ceres::CostFunction* Create(const vector<double>& delta_1,
-                                     const vector<double>& delta_2) {
+                                     const vector<double>& delta_2,
+                                     const vector<double>& u1,
+                                     const vector<double>& u2) {
     return (new ceres::NumericDiffCostFunction<PartialTranslationErrorNumeric, 
             ceres::CENTRAL, 1, 6>(
-            new PartialTranslationErrorNumeric(delta_1, delta_2)));
+            new PartialTranslationErrorNumeric(delta_1, delta_2, u1, u2)));
   }
 
  const vector<double> delta_1;
  const vector<double> delta_2;
+ const vector<double> u1;
+ const vector<double> u2;
 };
 
 void PartialCalibrate(
-        const vector<vector < double> >& deltas_1,
-        const vector<vector < double> >& deltas_2,
+        const vector<vector<double> >& deltas_1,
+        const vector<vector<double> >& uncertainty_1,
+        const vector<vector<double> >& deltas_2,
+        const vector<vector<double> >& uncertainty_2,
         double* transform,
         double* final_rmse) {
-  bool kUseNumericOverAutoDiff = false;
+  
+//   bool kUseNumericOverAutoDiff = false;
   CHECK_NOTNULL(transform);
   // Tolerance for RMSE.
   static const double kToleranceError = 0.00001;
@@ -260,14 +285,14 @@ void PartialCalibrate(
       ceres::CostFunction* cost_function = NULL;
       
       cost_function = PartialRotationErrorNumeric::Create(
-              deltas_1[i], deltas_2[i]);
+              deltas_1[i], deltas_2[i], uncertainty_1[i], uncertainty_2[i]);
       
       problem.AddResidualBlock(cost_function,
                                 NULL, // squared loss
                                 transform);
       
       cost_function = PartialTranslationErrorNumeric::Create(
-              deltas_1[i], deltas_2[i]);
+              deltas_1[i], deltas_2[i], uncertainty_1[i], uncertainty_2[i]);
       
       problem.AddResidualBlock(cost_function,
                                 NULL, // squared loss
@@ -281,7 +306,7 @@ void PartialCalibrate(
     ceres::Solve(options, &problem, &summary);
     rmse =
         sqrt(summary.final_cost / static_cast<double>(summary.num_residuals));
-//     std::cout << summary.FullReport() << "\n";
+    std::cout << summary.FullReport() << "\n";
     ceres::Problem::EvaluateOptions evalOptions = ceres::Problem::EvaluateOptions();
     residuals.clear();
     problem.Evaluate(evalOptions, NULL, &residuals, NULL, NULL);
@@ -318,9 +343,13 @@ int main(int argc, char **argv) {
   string file = "generated_deltas.txt";
   vector<vector<double> > deltas_1;
   vector<vector<double> > deltas_2;
+  vector<vector<double> > uncertainty_1;
+  vector<vector<double> > uncertainty_2;
   ReadDeltasFromFile(file,
                      &deltas_1,
-                     &deltas_2);
+                     &deltas_2,
+                     &uncertainty_1,
+                     &uncertainty_2);
 
   cout << deltas_1.size() << endl;
   cout << deltas_2.size() << endl;
@@ -332,7 +361,7 @@ int main(int argc, char **argv) {
   transform[4] = 0;
   transform[5] = 0;
   
-  double* RMSE;
-  PartialCalibrate(deltas_1, deltas_2, transform, RMSE);
+  double* RMSE = 0;
+  PartialCalibrate(deltas_1, uncertainty_1,deltas_2, uncertainty_2, transform, RMSE);
   return 0;
 }
