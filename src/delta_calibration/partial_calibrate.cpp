@@ -34,6 +34,29 @@ void PrintPose(double* pose){
   cout << endl;
 }
 
+void ReadUncertaintiesFromFile(string delta_file,
+                               vector<vector<double> >* uncertainty_1,
+                               vector<vector<double> >* uncertainty_2) {
+  cout << " reading" << endl;
+  std::ifstream infile(delta_file.c_str());
+  std::string line;
+  uncertainty_1->clear();
+  uncertainty_2->clear();
+  while (std::getline(infile, line)) {
+    vector<double> u1;
+    vector<double> u2;
+    u1.resize(3);
+    u2.resize(3);
+    std::istringstream iss(line);
+    if (!(iss >> u1[0] >> u1[1] >> u1[2]
+      >> u2[0] >> u2[1] >> u2[2] )) { 
+      cout << "problem" << endl;
+      break; } // error
+    uncertainty_1->push_back(u1);
+    uncertainty_2->push_back(u2);
+  }
+}
+
 void ReadDeltasFromFile(string delta_file,
                         vector<vector<double> >* deltas_1,
                         vector<vector<double> >* deltas_2,
@@ -109,7 +132,7 @@ Eigen::Transform<double, 3, Eigen::Affine> TransformUncertainty(
     Eigen::Vector3d temp = q_q * r_q_v;
     double mag = temp.dot(u_v);
     Eigen::Vector3d axis = mag * u_v;
-    Eigen::Quaternion<double> uncertain_q(axis[0], axis[1],axis[2],q_q.w());
+    Eigen::Quaternion<double> uncertain_q(axis[0], axis[1],axis[2],r_q.w());
     UncertainRotation = uncertain_q;
   } else{
     Eigen::Quaternion<double> uncertain_q(0,0,0,0);
@@ -221,9 +244,9 @@ struct PartialTranslationErrorNumeric {
     
     
     Eigen::Vector3d left;
-    left = T - (q1 * T) - l_u1 - l_u2;
+    left = (T - (q1 * T)) - l_u1 - l_u2;
     Eigen::Vector3d right;
-    right = t1 - (q * t2) + r_u1 - r_u2;
+    right = (t1 - (q * t2)) + r_u1 - r_u2;
     
     Eigen::Vector3d error_vector = left - right;
     
@@ -248,11 +271,13 @@ struct PartialTranslationErrorNumeric {
  const vector<double> u2;
 };
 
-void PartialCalibrate(
+void PartialCalibrateR(
         const vector<vector<double> >& deltas_1,
-        const vector<vector<double> >& uncertainty_1,
+        const vector<vector<double> >& uncertaintyR_1,
+        const vector<vector<double> >& uncertaintyT_1,
         const vector<vector<double> >& deltas_2,
-        const vector<vector<double> >& uncertainty_2,
+        const vector<vector<double> >& uncertaintyR_2,
+        const vector<vector<double> >& uncertaintyT_2,
         double* transform,
         double* final_rmse) {
   
@@ -285,14 +310,69 @@ void PartialCalibrate(
       ceres::CostFunction* cost_function = NULL;
       
       cost_function = PartialRotationErrorNumeric::Create(
-              deltas_1[i], deltas_2[i], uncertainty_1[i], uncertainty_2[i]);
+              deltas_1[i], deltas_2[i], uncertaintyR_1[i], uncertaintyR_2[i]);
       
       problem.AddResidualBlock(cost_function,
                                 NULL, // squared loss
                                 transform);
+    }
+    
+    // Run Ceres problem
+    ceres::Solver::Options options;
+    options.linear_solver_type = ceres::DENSE_QR;
+    ceres::Solver::Summary summary;
+    ceres::Solve(options, &problem, &summary);
+    rmse =
+        sqrt(summary.final_cost / static_cast<double>(summary.num_residuals));
+    std::cout << summary.FullReport() << "\n";
+    ceres::Problem::EvaluateOptions evalOptions = ceres::Problem::EvaluateOptions();
+    residuals.clear();
+    problem.Evaluate(evalOptions, NULL, &residuals, NULL, NULL);
+  }
+  PrintPose(transform);
+  fprintf(stdout, "RMSE: %f\n", rmse);
+}
+
+void PartialCalibratet(
+        const vector<vector<double> >& deltas_1,
+        const vector<vector<double> >& uncertaintyR_1,
+        const vector<vector<double> >& uncertaintyT_1,
+        const vector<vector<double> >& deltas_2,
+        const vector<vector<double> >& uncertaintyR_2,
+        const vector<vector<double> >& uncertaintyT_2,
+        double* transform,
+        double* final_rmse) {
+  
+//   bool kUseNumericOverAutoDiff = false;
+  CHECK_NOTNULL(transform);
+  // Tolerance for RMSE.
+  static const double kToleranceError = 0.00001;
+  // The maximum number of overall iterations.
+  static const int kMaxIterations = 80;
+  // The maximum number of repeat iterations while the RMSE is unchanged.
+  static const int kMaxRepeatIterations = 5;
+  double rmse = 1000000;
+  double last_rmse = 1000010;
+  vector<double> residuals;
+  
+  for (int iteration = 0, repeat_iteration = 0;
+       iteration < kMaxIterations &&
+       repeat_iteration < kMaxRepeatIterations &&
+       rmse > kToleranceError;
+       ++iteration) {
+    if (DoubleEquals(rmse, last_rmse)) {
+      repeat_iteration++;
+    } else {
+      repeat_iteration = 0;
+    }
+    last_rmse = rmse;
+    // Construct ICP problem
+    ceres::Problem problem;
+    for(size_t i = 0; i < deltas_1.size(); i++) {
+      ceres::CostFunction* cost_function = NULL;
       
       cost_function = PartialTranslationErrorNumeric::Create(
-              deltas_1[i], deltas_2[i], uncertainty_1[i], uncertainty_2[i]);
+              deltas_1[i], deltas_2[i], uncertaintyT_1[i], uncertaintyT_2[i]);
       
       problem.AddResidualBlock(cost_function,
                                 NULL, // squared loss
@@ -343,13 +423,19 @@ int main(int argc, char **argv) {
   string file = "generated_deltas.txt";
   vector<vector<double> > deltas_1;
   vector<vector<double> > deltas_2;
-  vector<vector<double> > uncertainty_1;
-  vector<vector<double> > uncertainty_2;
+  vector<vector<double> > uncertaintyR_1;
+  vector<vector<double> > uncertaintyR_2;
+  vector<vector<double> > uncertaintyT_1;
+  vector<vector<double> > uncertaintyT_2;
   ReadDeltasFromFile(file,
                      &deltas_1,
                      &deltas_2,
-                     &uncertainty_1,
-                     &uncertainty_2);
+                     &uncertaintyR_1,
+                     &uncertaintyR_2);
+  
+  ReadUncertaintiesFromFile("generated_uncertaintiest.txt",
+                     &uncertaintyT_1,
+                     &uncertaintyT_2);
 
   cout << deltas_1.size() << endl;
   cout << deltas_2.size() << endl;
@@ -362,6 +448,7 @@ int main(int argc, char **argv) {
   transform[5] = 0;
   
   double* RMSE = 0;
-  PartialCalibrate(deltas_1, uncertainty_1,deltas_2, uncertainty_2, transform, RMSE);
+  PartialCalibrateR(deltas_1, uncertaintyT_1, uncertaintyT_1, deltas_2, uncertaintyT_2, uncertaintyT_2,transform, RMSE);
+//   PartialCalibratet(deltas_1, uncertaintyR_1, uncertaintyT_1, deltas_2, uncertaintyR_2, uncertaintyT_2,transform, RMSE);
   return 0;
 }
