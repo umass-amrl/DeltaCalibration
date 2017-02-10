@@ -132,7 +132,7 @@ Eigen::Transform<double, 3, Eigen::Affine> TransformUncertainty(
     Eigen::Vector3d temp = q_q * r_q_v;
     double mag = temp.dot(u_v);
     Eigen::Vector3d axis = mag * u_v;
-    Eigen::Quaternion<double> uncertain_q(axis[0], axis[1],axis[2],r_q.w());
+    Eigen::Quaternion<double> uncertain_q(r_q.w(), axis[0], axis[1],axis[2]);
     UncertainRotation = uncertain_q;
   } else{
     Eigen::Quaternion<double> uncertain_q(0,0,0,0);
@@ -449,6 +449,6 @@ int main(int argc, char **argv) {
   
   double* RMSE = 0;
   PartialCalibrateR(deltas_1, uncertaintyT_1, uncertaintyT_1, deltas_2, uncertaintyT_2, uncertaintyT_2,transform, RMSE);
-//   PartialCalibratet(deltas_1, uncertaintyR_1, uncertaintyT_1, deltas_2, uncertaintyR_2, uncertaintyT_2,transform, RMSE);
+  PartialCalibratet(deltas_1, uncertaintyR_1, uncertaintyR_2, deltas_2, uncertaintyR_1, uncertaintyR_2,transform, RMSE);
   return 0;
 }

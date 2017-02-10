@@ -56,19 +56,19 @@ end
 keys = C0(:, 8:8);
 %  Filter the data to ignore inconsistent steps
 deleted = [];
-for i = N:-1:1
-  if abs(A0(i)-A1(i)) > 1/180*pi
-    fprintf('Deleting record %d, delta=%f\n', i, 180/pi*abs(A0-A1));
-    AA0(i,:) = [];
-    AA1(i,:) = [];
-    A0(i) = [];
-    A1(i) = [];
-    C0(i,:) = [];
-    %C1(i,:) = [];
-    N = N - 1;
-    deleted = [deleted; i];
-  end
-end
+% for i = N:-1:1
+%   if abs(A0(i)-A1(i)) > 1/180*pi
+%     fprintf('Deleting record %d, delta=%f\n', i, 180/pi*abs(A0-A1));
+%     AA0(i,:) = [];
+%     AA1(i,:) = [];
+%     A0(i) = [];
+%     A1(i) = [];
+%     C0(i,:) = [];
+%     %C1(i,:) = [];
+%     N = N - 1;
+%     deleted = [deleted; i];
+%   end
+% end
 
 
 if debug
