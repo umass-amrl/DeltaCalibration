@@ -3,9 +3,9 @@ function stripped = StripTranslation(tf, u)
   t = tf(4:6);
   tf
   u
-  t_part = dot(t, u')/norm(u) * u'
-  t
-  tf
-  stripped = t - t_part'
+  r_q = aa2quat(r_aa')
+  r_v = [r_q(1), r_q(2), r_q(3)]
+  t_part = dot(tf', u')/norm(u) * u'
+  stripped = tf - t)
   stripped = [r_aa stripped 0 0]
 end

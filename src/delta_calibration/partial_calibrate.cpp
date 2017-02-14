@@ -208,49 +208,75 @@ struct PartialRotationErrorNumeric {
 struct PartialTranslationErrorNumeric {
   PartialTranslationErrorNumeric(const vector<double>& delta_1,
                        const vector<double>& delta_2,
-                       const vector<double>& u1,
-                       const vector<double>& u2) :
+                       const vector<double>& ur1,
+                       const vector<double>& ur2,
+                       const vector<double>& ut1,
+                       const vector<double>& ut2
+                                ) :
       delta_1(delta_1),
       delta_2(delta_2),
-      u1(u1),
-      u2(u2){}
+      ur1(ur1),
+      ur2(ur2),
+      ut1(ut1),
+      ut2(ut2){}
 
-  bool operator()(const double* const camera,
+  bool operator()(const double* const transform,
                   double* residuals) const {
 
     Eigen::Transform<double, 3, Eigen::Affine> q = 
-        AAToTransform(camera[0], camera[1], camera[2]);
+    AAToTransform(transform[0], transform[1], transform[2]);
     Eigen::Transform<double, 3, Eigen::Affine> q1 = 
         AAToTransform(double(delta_1[0]), double(delta_1[1]), double(delta_1[2]));
+        Eigen::Transform<double, 3, Eigen::Affine> q2 = 
+        AAToTransform(double(delta_2[0]), double(delta_2[1]), double(delta_2[2]));
     
     Eigen::Vector3d t1;
     Eigen::Vector3d t2;
     Eigen::Vector3d T;
     t1 << delta_1[3], delta_1[4], delta_1[5];
     t2 << delta_2[3], delta_2[4], delta_2[5];
-    T << camera[3], camera[4], camera[5];
+    T << transform[3], transform[4], transform[5];
     
-    Eigen::Vector3d u1_v;
-    u1_v << u1[0], u1[1], u1[2];
-    Eigen::Vector3d u2_v;
-    u2_v << u2[0], u2[1], u2[2];
+    Eigen::Vector3d ut1_v;
+    ut1_v << ut1[0], ut1[1], ut1[2];
+    Eigen::Vector3d ut2_v;
+    ut2_v << ut2[0], ut2[1], ut2[2];
+    Eigen::Vector3d ur1_v;
+    ur1_v << ur1[0], ur1[1], ur1[2];
+    Eigen::Vector3d ur2_v;
+    ur2_v << ur2[0], ur2[1], ur2[2];
     
     // Vector projections for partials based on uncertainty
     
-    Eigen::Vector3d l_u1 = (q1 * T).dot(u1_v) * u1_v;
-    Eigen::Vector3d l_u2 = (q1 * T).dot(q * u2_v) * u2_v;
-    Eigen::Vector3d r_u1 = (q * t2).dot(u1_v) * u1_v;
-    Eigen::Vector3d r_u2 = t1.dot(q * u2_v) * u2_v;
+    Eigen::Vector3d l_ut1 = (q1 * T).dot(ut1_v) * ut1_v; // Portion of q1T which cannot be observed in sensor 1's frame of reference
+    Eigen::Vector3d l_ut2 = (q1 * T).dot(q * ut2_v) * ut2_v; // Portion of q1T which could not be observed in sensor 2's frame of reference
+    Eigen::Transform<double, 3, Eigen::Affine> v2 = TransformUncertainty(q.inverse(), q1, ur2); 
+    Eigen::Transform<double, 3, Eigen::Affine> v1 = TransformUncertainty(q, q2, ur1); 
+    Eigen::Vector3d l_ur2 = v1 * T; // Portion of T related to a portion of q1 that could not be observed
+    Eigen::Vector3d l_ur2_ut1 = (v2 * T).dot(ut1_v) * ut1_v; // Portion of T related to a portion of q1 that could not be observed, corresponding to u1
+    Eigen::Vector3d l_ur2_ut2 = (v2 * T).dot(ut2_v) * ut2_v; // Portion of T related to a portion of q1 that could not be observed, corresponding to u2
+    
+    Eigen::Vector3d r_ut1 = (q * t2).dot(ut1_v) * ut1_v;
+    Eigen::Vector3d r_ut2 = t1.dot(q * ut2_v) * ut2_v;
     
     
     Eigen::Vector3d left;
-    left = (T - (q1 * T)) - l_u1 - l_u2;
+    left = (T - (q1 * T));
     Eigen::Vector3d right;
-    right = (t1 - (q * t2)) + r_u1 - r_u2;
+    right = (t1 - (q * t2));
     
     Eigen::Vector3d error_vector = left - right;
-    
-    residuals[0] = error_vector.norm();
+    if(ut1_v.norm() != 0) {
+      error_vector = error_vector - (error_vector.dot(ut1_v) * ut1_v);
+    }
+    if(ut2_v.norm() != 0) {
+      error_vector = error_vector - (error_vector.dot(q * ut2_v) * ut2_v);
+    }
+    if(ur1_v.norm() != 0) {
+      residuals[0] = error_vector.dot(ur1_v);
+    } else{
+      residuals[0] = error_vector.norm();
+    }
     return true;
   }
 
@@ -258,17 +284,22 @@ struct PartialTranslationErrorNumeric {
   // the client code.
   static ceres::CostFunction* Create(const vector<double>& delta_1,
                                      const vector<double>& delta_2,
-                                     const vector<double>& u1,
-                                     const vector<double>& u2) {
+                                     const vector<double>& ur1,
+                                     const vector<double>& ur2,
+                                     const vector<double>& ut1,
+                                     const vector<double>& ut2
+                                    ) {
     return (new ceres::NumericDiffCostFunction<PartialTranslationErrorNumeric, 
             ceres::CENTRAL, 1, 6>(
-            new PartialTranslationErrorNumeric(delta_1, delta_2, u1, u2)));
+            new PartialTranslationErrorNumeric(delta_1, delta_2, ur1, ur2, ut1, ut2)));
   }
 
  const vector<double> delta_1;
  const vector<double> delta_2;
- const vector<double> u1;
- const vector<double> u2;
+ const vector<double> ur1;
+ const vector<double> ur2;
+ const vector<double> ut1;
+ const vector<double> ut2;
 };
 
 void PartialCalibrateR(
@@ -354,7 +385,14 @@ void PartialCalibratet(
   double rmse = 1000000;
   double last_rmse = 1000010;
   vector<double> residuals;
-  
+  double* trans = new double[3];
+  trans[0] = transform[3];
+  trans[1] = transform[4];
+  trans[2] = transform[5];
+  double* rot = new double[3];
+  rot[0] = transform[0];
+  rot[1] = transform[1];
+  rot[2] = transform[2];
   for (int iteration = 0, repeat_iteration = 0;
        iteration < kMaxIterations &&
        repeat_iteration < kMaxRepeatIterations &&
@@ -372,11 +410,12 @@ void PartialCalibratet(
       ceres::CostFunction* cost_function = NULL;
       
       cost_function = PartialTranslationErrorNumeric::Create(
-              deltas_1[i], deltas_2[i], uncertaintyT_1[i], uncertaintyT_2[i]);
+              deltas_1[i], deltas_2[i], uncertaintyR_1[i], uncertaintyR_2[i], uncertaintyT_1[i], uncertaintyT_2[i]);
       
       problem.AddResidualBlock(cost_function,
                                 NULL, // squared loss
                                 transform);
+//       problem.SetParameterBlockConstant(rot);
     }
     
     // Run Ceres problem
@@ -424,18 +463,24 @@ int main(int argc, char **argv) {
   vector<vector<double> > deltas_1;
   vector<vector<double> > deltas_2;
   vector<vector<double> > uncertaintyR_1;
+  vector<vector<double> > uncertaintyE_1;
+  vector<vector<double> > uncertaintyE_2;
   vector<vector<double> > uncertaintyR_2;
   vector<vector<double> > uncertaintyT_1;
   vector<vector<double> > uncertaintyT_2;
   ReadDeltasFromFile(file,
                      &deltas_1,
                      &deltas_2,
-                     &uncertaintyR_1,
-                     &uncertaintyR_2);
+                     &uncertaintyE_1,
+                     &uncertaintyE_2);
   
   ReadUncertaintiesFromFile("generated_uncertaintiest.txt",
                      &uncertaintyT_1,
                      &uncertaintyT_2);
+  
+  ReadUncertaintiesFromFile("generated_uncertaintiesr.txt",
+                            &uncertaintyR_1,
+                            &uncertaintyR_2);
 
   cout << deltas_1.size() << endl;
   cout << deltas_2.size() << endl;
@@ -448,7 +493,7 @@ int main(int argc, char **argv) {
   transform[5] = 0;
   
   double* RMSE = 0;
-  PartialCalibrateR(deltas_1, uncertaintyT_1, uncertaintyT_1, deltas_2, uncertaintyT_2, uncertaintyT_2,transform, RMSE);
-  PartialCalibratet(deltas_1, uncertaintyR_1, uncertaintyR_2, deltas_2, uncertaintyR_1, uncertaintyR_2,transform, RMSE);
+  PartialCalibrateR(deltas_1, uncertaintyR_1, uncertaintyT_1, deltas_2, uncertaintyR_2, uncertaintyT_2,transform, RMSE);
+  PartialCalibratet(deltas_1, uncertaintyR_1, uncertaintyT_1, deltas_2, uncertaintyR_2, uncertaintyT_2,transform, RMSE);
   return 0;
 }

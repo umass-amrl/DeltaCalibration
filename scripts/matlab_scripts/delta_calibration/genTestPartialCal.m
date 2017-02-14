@@ -16,6 +16,8 @@ A1T = [];
 A2T = [];
 U1t = [];
 U2t = [];
+U1r = [];
+U2r = [];
 uz = [0 0 1];
 ux = [1 0 0];
 uy = [0 1 0];
@@ -38,25 +40,26 @@ for i=1:N
   a2y = A1toA2(A', a1y');
   a2z = A1toA2(A', a1z');
   
-  a1x_ux = StripRotation(a1x,ux);  
-  a1x_uy = StripRotation(a1x,uy);
-  a1y_ux = StripRotation(a1y, ux);
-  a1y_uy = StripRotation(a1y, uy);
+  a1x_ux = StripRotation(a1x,uy);  
+  a1x_uy = StripRotation(a1x,ux);
+  a1y_ux = StripRotation(a1y, uy);
+  a1y_uy = StripRotation(a1y, ux);
+
+  a1x_ux = StripTranslation(a1x_ux,ux);  
+  a1x_uy = StripTranslation(a1x_uy,uy);
+  a1y_ux = StripTranslation(a1y_ux, ux);
+  a1y_uy = StripTranslation(a1y_uy, uy);
   
+%   A1 = [A1; a1x];
+%   A1 = [A1; a1y];
+%   A1 = [A1; a1x];
+%   A1 = [A1; a1y];
+%   
   A1 = [A1; a1x_ux];
   A1 = [A1; a1y_ux];
   A1 = [A1; a1x_uy];
   A1 = [A1; a1y_uy];
   
-  a1x
-  a1x_ux
-  a1y
-  a1y_ux
-  a1x
-  a1x_uy
-  a1y
-  a1y_uy
-  
   A2 = [A2; a2x];
   A2 = [A2; a2y];
   A2 = [A2; a2x];
@@ -67,10 +70,24 @@ for i=1:N
   U1t = [U1t ; uy];
   U1t = [U1t ; uy];
   
+  U1r = [U1r ; uy];
+  U1r = [U1r ; uy];
+  U1r = [U1r ; ux];
+  U1r = [U1r ; ux];
+%   U1t = [U1t ; u0];
+%   U1t = [U1t ; u0];
+%   U1t = [U1t ; u0];
+%   U1t = [U1t ; u0];
+%   
   U2t = [U2t ; u0];
   U2t = [U2t ; u0];
   U2t = [U2t ; u0];
   U2t = [U2t ; u0];
+  
+  U2r = [U2r ; u0];
+  U2r = [U2r ; u0];
+  U2r = [U2r ; u0];
+  U2r = [U2r ; u0];
   
   %A2(end,:) = AddNoiseToTransform6D(A2(end,:)', noise_angular, noise_translation)';
 end
@@ -79,8 +96,10 @@ end
 % % Test Calibration Math with generated data.
 C0 = [A1 A2];
 Ut = [U1t U2t];
+Ur = [U1r U2r];
 dlmwrite('generated_deltas.txt', C0, ' ');
 dlmwrite('generated_uncertaintiest.txt', Ut, ' ');
+dlmwrite('generated_uncertaintiesr.txt', Ur, ' ');
 size(C0);
 A_cal = calibrate_data(C0)
 A
