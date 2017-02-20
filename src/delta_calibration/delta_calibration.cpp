@@ -1,7 +1,8 @@
 //----------- INCLUDES
 #include <nav_msgs/Odometry.h>
 #include "delta_calibration/icp.h"
-
+#include <pcl/segmentation/sac_segmentation.h>
+#include <pcl/filters/extract_indices.h>
 
 using std::size_t;
 using std::vector;
@@ -38,6 +39,11 @@ void PopFront(std::vector<T>* vec)
 {
   assert(!vec.empty());
   vec.erase(vec.begin());
+}
+
+// For checking if the mean has not changed
+bool DoubleEquals(double x, double y) {
+  return fabs(x-y) < .1;
 }
 
 void SavePoses(const vector<double*>& poses, string& filename) {
@@ -83,6 +89,94 @@ void WritePoseFile(double* pose,
   file << std::flush;
 }
 
+void WriteUncertaintyFile(Eigen::Vector3d u, ofstream& file) {
+  
+  if (file.is_open()) {
+    file << u[0] << "\t" << u[1] << "\t" << u[2] << endl;
+    file << std::flush;
+  }
+}
+
+template <class T> Eigen::Transform<T, 3, Eigen::Affine> AAToTransform(T x, T y, T z) {
+  //Create the eigen transform from the components
+  Eigen::Matrix<T,3,1> axis(x, y, z);
+  const T angle = axis.norm();
+  if (angle > T(0)) {
+    axis = axis / angle;
+  }
+  const Eigen::Transform<T, 3, Eigen::Affine> rotation =
+  Eigen::Transform<T, 3, Eigen::Affine>(
+    Eigen::AngleAxis<T>(angle, axis));
+  return rotation;
+}
+
+
+Eigen::Transform<double, 3, Eigen::Affine> TransformUncertainty(
+  Eigen::Transform<double, 3, Eigen::Affine> q,
+  Eigen::Transform<double, 3, Eigen::Affine> r,
+  const vector<double>& u) {
+  
+  Eigen::Transform<double, 3, Eigen::Affine> UncertainRotation;
+  
+  Eigen::Quaternion<double> q_q;
+  q_q = q.rotation();
+  Eigen::Quaternion<double> r_q;
+  r_q = r.rotation();
+  Eigen::Vector3d q_q_v;
+  q_q_v << q_q.x(), q_q.y(), q_q.z();
+  Eigen::Vector3d r_q_v;
+  r_q_v << r_q.x(), r_q.y(), r_q.z();
+  Eigen::Vector3d u_v;
+  u_v << u[0], u[1], u[2];
+  if(u_v.norm() != 0) {
+    u_v.normalize();
+    Eigen::Vector3d temp = q_q * r_q_v;
+    double mag = temp.dot(u_v);
+    Eigen::Vector3d axis = mag * u_v;
+    Eigen::Quaternion<double> uncertain_q(r_q.w(), axis[0], axis[1],axis[2]);
+    UncertainRotation = uncertain_q;
+  } else{
+    Eigen::Quaternion<double> uncertain_q(0,0,0,0);
+    UncertainRotation = uncertain_q;
+  }
+  
+  return UncertainRotation;
+  }
+  
+  void StripUncertainty(Vector3d ut, Vector3d ur, double* transform) {
+    Eigen::Transform<double, 3, Eigen::Affine> R = AAToTransform(transform[0], transform[1], transform[2]);
+    Eigen::Transform<double, 3, Eigen::Affine> I = AAToTransform(0.0, 0.0, 0.0);
+    vector<double> ur_v = {ur[0], ur[1], ur[2]}; 
+    Eigen::Vector3d trans = {transform[3], transform[4], transform[5]};
+    
+    
+    if(ur.norm() != 0) {
+      Eigen::Transform<double, 3, Eigen::Affine> U = TransformUncertainty(I, R, ur_v);
+      R = U.inverse() * R;
+      // Find the rotation component
+      // Find the angle axis format
+      
+      trans = trans.dot(ur)*ur;
+    } else {
+      trans = trans - (trans.dot(ut)*ut);
+    }
+    Eigen::AngleAxis<double> angle_axis(R.rotation());
+    
+    // Get the axis
+    Eigen::Matrix<double, 3, 1> normal_axis = angle_axis.axis();
+    
+    // Recompute the rotation angle
+    double combined_angle = angle_axis.angle();
+    Eigen::Matrix<double, 3, 1> combined_axis = normal_axis * combined_angle;
+    
+    transform[0] = combined_axis[0];
+    transform[1] = combined_axis[1];
+    transform[2] = combined_axis[2];
+    transform[3] = trans[0];
+    transform[4] = trans[1];
+    transform[5] = trans[2];
+  }
+
 void CalculateDelta(
     const int k,
     const vector<ros::Publisher>& publishers,
@@ -105,6 +199,7 @@ void CalculateDelta(
     vector<Eigen::Vector2d> empty_coords;
   // Run ICP between clouds k and
   // clouds k-1 (either the keyframe or the last clouds)
+  fprintf(stdout, "ICP 1 \n");
   ICP (k,
        .05,
        publishers,
@@ -124,11 +219,11 @@ void CalculateDelta(
   double angle_degree = (180/3.14) * angle;
   cout << "Instant angular rotation: " << angle_degree << endl;
   *final_rmse = angle_degree;
-//       fprintf(stdout, "ICP 1 \n");
+      
 //    combine the transform returned by ICP with the combined transform,
 //    and run ICP between clouds k and the last keyframe
       CombineTransform(transform, calculated_delta);
-
+      fprintf(stdout, "ICP 2 \n");
       ICP (k,
        .05,
        publishers,
@@ -142,7 +237,7 @@ void CalculateDelta(
        empty_coords,
        transform,
        NULL);
-//       fprintf(stdout, "ICP 2 \n");
+     
       double zero_pose[6];
       std::copy(pose0.begin(), pose0.end(), zero_pose);
 
@@ -156,6 +251,117 @@ void CalculateDelta(
 //                               3
 //       );
 
+}
+
+void ExtractUncertainty(
+    vector<Eigen::Vector4d> normal_equations,
+    Eigen::Vector3d* uncertainty_T,
+    Eigen::Vector3d* uncertainty_R) {
+  
+  Eigen::Vector3d rot_u;
+  Eigen::Vector3d trans_u = {0, 0, 0};
+  bool first_normal = true;
+  for(size_t i = 0; i < normal_equations.size(); i++) {
+    Eigen::Vector4d normal_equation = normal_equations[i];
+    Eigen::Vector3d normal = {normal_equation[0],normal_equation[1], normal_equation[2]};
+    if(!first_normal) {
+      if(!DoubleEquals(abs(rot_u.dot(normal)), 1)) {
+        trans_u = rot_u.cross(normal);
+        rot_u[0] = 0;
+        rot_u[1] = 0;
+        rot_u[2] = 0;
+        break;
+      }
+    } else {
+      first_normal = false;
+      rot_u = normal;
+    }
+  }
+  *uncertainty_T = trans_u;
+  *uncertainty_R = rot_u;
+}
+
+vector<pcl::PointCloud<pcl::PointXYZ> > ExtractPlanes(
+  pcl::PointCloud<pcl::PointXYZ> cloud,
+  vector<Eigen::Vector4d>* normal_equations,
+  vector<Eigen::Vector3d>* centroids
+) {
+  
+  vector<pcl::PointCloud<pcl::PointXYZ> > output;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>),
+  cloud_p (new pcl::PointCloud<pcl::PointXYZ>),
+  cloud_f (new pcl::PointCloud<pcl::PointXYZ>);
+  
+  // Convert to the templated PointCloud
+  cloud_filtered = cloud.makeShared();
+  vector<Eigen::Vector4d> equations;
+  pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ());
+  pcl::PointIndices::Ptr inliers (new pcl::PointIndices ());
+  // Create the segmentation object
+  pcl::SACSegmentation<pcl::PointXYZ> seg;
+  // Optional
+  seg.setOptimizeCoefficients (true);
+  // Mandatory
+  seg.setModelType (pcl::SACMODEL_PLANE);
+  seg.setMethodType (pcl::SAC_RANSAC);
+  seg.setMaxIterations (1000);
+  seg.setDistanceThreshold (0.01);
+  
+  // Create the filtering object
+  pcl::ExtractIndices<pcl::PointXYZ> extract;
+  
+  int i = 0;
+  double nr_points = (int) cloud_filtered->points.size ();
+  // While 10% of the original cloud is still there
+  int num_planes = 0;
+  while (nr_points > (.1 * cloud.size()))
+  {
+    Eigen::Vector4d equation;
+    num_planes +=1;
+    // Segment the largest planar component from the remaining cloud
+    seg.setInputCloud (cloud_filtered);
+    seg.segment (*inliers, *coefficients);
+    if (inliers->indices.size () == 0)
+    {
+      std::cerr << "Could not estimate a planar model for the given dataset." << std::endl;
+      break;
+    }
+    
+    // Extract the inliers
+    extract.setInputCloud (cloud_filtered);
+    extract.setIndices (inliers);
+    extract.setNegative (false);
+    extract.filter (*cloud_p);
+    std::cerr << "PointCloud representing the planar component: " << cloud_p->width * cloud_p->height << " data points." << std::endl;
+    // Create the filtering object
+    extract.setNegative (true);
+    extract.filter (*cloud_f);
+    cloud_filtered.swap (cloud_f);
+    i++;
+//     PublishCloud(*cloud_p, cloud_test_pub);
+//     PublishCloud(*cloud_f, model_cloud_pub);
+//     PublishCloud(*cloud_filtered, bmodel_cloud_pub);
+    equation[0] = coefficients->values[0];
+    equation[1] = coefficients->values[1];
+    equation[2] = coefficients->values[2];
+    equation[3] = coefficients->values[3];
+    equations.push_back(equation);
+    output.push_back(*cloud_p);
+  }
+  for(size_t i = 0; i < output.size(); i++) {
+    Eigen::Vector3d centroid;
+    pcl::PointCloud<pcl::PointXYZ> current_cloud = output[i];
+    for(size_t j = 0; j < output[i].size(); j++) {
+      pcl::PointXYZ point = current_cloud[j];
+      centroid[0] += point.x;
+      centroid[1] += point.y;
+      centroid[2] += point.z;
+    }
+    centroid = centroid / current_cloud.size();
+    centroids->push_back(centroid);
+  }
+  *normal_equations = equations;
+  return output;
 }
 
 struct DeltaCalVariables {
@@ -348,7 +554,7 @@ rosbag::View::iterator InitializeVariablesBrass(
   input->k1_base_name =  input->k1_output_name + ".base";
   
   // Opening pose and trajectory files
-  input->pose_name = "brass.pose";
+  input->pose_name = bag_name + "_brass.pose";
   input->velocity_name = bag_name + ".velocity";
   input->trajectory_name = bag_name + ".traj";
   ofstream traj_file (input->trajectory_name.c_str());
@@ -1339,7 +1545,7 @@ void DeltaCalculationBrass(string bag_name,
                               const int kMaxClouds) {
   
   // --- INITIALIZATION ---
-  bool log = false;
+  bool log = true;
   DeltaCalVariables* variables = new DeltaCalVariables();
   //Opening bagfile
   string bag_file = bag_name + ".bag";
@@ -1366,7 +1572,10 @@ void DeltaCalculationBrass(string bag_name,
   odom_it = ClosestOdom(odom_it, odom_end, variables->k1_timestamp, &keyframe_odom);
   previous_odom = keyframe_odom;
   ofstream pose_file (variables->pose_name.c_str());
-  ofstream odom_file ("brass_odom.txt"); // Figure out odometry file?
+  string uncertainty_t_string = bag_name + "_uncertainty_t.txt";
+  string uncertainty_r_string = bag_name + "_uncertainty_r.txt";
+  ofstream uncertaintyT_file (uncertainty_t_string.c_str());
+  ofstream uncertaintyR_file (uncertainty_r_string.c_str());
   
   int avg_len = 5;
   bool dist_okay = false;
@@ -1417,6 +1626,7 @@ void DeltaCalculationBrass(string bag_name,
   // have the advantage of only needing one residual (will check against lab computers and other methods)
   if ((k1_residual > 0.003 ) || dist_okay) {
     // Run ICP
+    double rot1;
     fprintf(stdout, "Kinect 1\n");
     CalculateDelta(count,
                    publishers,
@@ -1429,7 +1639,12 @@ void DeltaCalculationBrass(string bag_name,
                    k1_normal,
                    variables->k1_key_normal,
                    variables->k1_combined_transform,
-                   NULL);
+                   &rot1);
+    const double k1_velocity = rot1 / (variables->k1_timestamp - variables->k1_prev_timestamp);
+    variables->k1_velocity_list[count % avg_len] = k1_velocity;
+    double k1_acc_velocity =
+    std::accumulate(variables->k1_velocity_list.begin(), variables->k1_velocity_list.end(), 0.0);
+    k1_acc_velocity = k1_acc_velocity / avg_len;
   }
   // Check the magnitude of translation and angle of rotation, if larger
   // than some threshold, this is our next keyframe
@@ -1457,20 +1672,36 @@ void DeltaCalculationBrass(string bag_name,
     variables->k1_keyframe = k1_cloud;
     variables->k1_key_normal = k1_normal;
     variables->keys.push_back(count);
+    vector<Eigen::Vector4d> plane_normals;
+    vector<Eigen::Vector3d> plane_centroids;
+    cout << "Extracting Planes" << endl;
+    ExtractPlanes(k1_cloud, &plane_normals, &plane_centroids);
     
+    Eigen::Vector3d uncertainty_t;
+    Eigen::Vector3d uncertainty_r;
+    cout << "exctracting Uncertainty" << endl;
+    ExtractUncertainty(plane_normals, &uncertainty_t, &uncertainty_r);
+    
+    cout << "Writing Uncertainty " << endl;
+    // Writes both deltas to the same file
+    WriteUncertaintyFile(uncertainty_t, uncertaintyT_file);
+    WriteUncertaintyFile(uncertainty_r, uncertaintyR_file);
+    
+    StripUncertainty(uncertainty_t, uncertainty_r, variables->k1_combined_transform);
     // Writes both deltas to the same file
     WritePoseFile(variables->k1_combined_transform, variables->k1_timestamp, 
         count, pose_file);
     WritePoseFile(odom_delta, variables->k1_timestamp, count, pose_file);
     pose_file << endl;
+    // Zero Combined transforms
+    std::copy(pose0.begin(), pose0.end(), variables->k1_combined_transform);
     
     // Transform the clouds and then write them to object files
     if(log) {
     pcl::PointCloud<pcl::PointXYZ> temp_cloud1 = k1_cloud;
-    WriteToBag("kinect_1", &keyframe_bag, k1_cloud);
+// //     WriteToBag("kinect_1", &keyframe_bag, k1_cloud);
     TransformPointCloud(&temp_cloud1, variables->k1_combined_transform);
-    // Zero Combined transforms
-    std::copy(pose0.begin(), pose0.end(), variables->k1_combined_transform);
+    
     WriteToObj(variables->object_file, variables->k1_output_name, count, temp_cloud1);
     WriteToObj(variables->object_file, variables->k1_base_name, count, k1_cloud);
     }
@@ -1551,7 +1782,8 @@ int main(int argc, char **argv) {
     DeltaCalculation(bag_file, publishers, max_delta_degrees, 
                      max_clouds);
   } else if(mode == 1) {
-    DeltaCalculationOdometry(bag_file, publishers, max_delta_degrees, 
+    cout << "Brass Delta Calculation" << endl;
+    DeltaCalculationBrass(bag_file, publishers, max_delta_degrees, 
                              max_clouds);
   } else {
     DeltaCalculationSingle(bag_file, publishers, max_delta_degrees, 

@@ -270,7 +270,7 @@ struct PartialTranslationErrorNumeric {
       error_vector = error_vector - (error_vector.dot(ut1_v) * ut1_v);
     }
     if(ut2_v.norm() != 0) {
-      error_vector = error_vector - (error_vector.dot(q * ut2_v) * ut2_v);
+      error_vector = error_vector - (error_vector.dot(q * ut2_v) * (q * ut2_v));
     }
     if(ur1_v.norm() != 0) {
       residuals[0] = error_vector.dot(ur1_v);

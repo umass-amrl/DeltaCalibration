@@ -11,8 +11,8 @@ namespace icp {
 
 bool first_nn = true;
 int count = 0;
-const float nn_dist = .01;
-float neighbor_dist = .01;
+const float nn_dist = .05;
+float neighbor_dist = .05;
 vector<int> x_pos;
 vector<int> y_pos;
 
@@ -2243,6 +2243,17 @@ rosbag::View::iterator OneSensorClouds(rosbag::View::iterator it,
   return it;
 }
 
+void OrientCloud(pcl::PointCloud<pcl::PointXYZ>* cloud) {
+  for(size_t i = 0; i < cloud->size(); ++i) {
+    pcl::PointXYZ point = (*cloud)[i];
+    pcl::PointXYZ point2;
+    point2.x = point.z;
+    point2.y = -point.x;
+    point2.z = -point.y;
+    (*cloud)[i] = point2;
+  }
+}
+
 rosbag::View::iterator OneSensorCloudsBrass(rosbag::View::iterator it,
                                          rosbag::View::iterator end,
                                          std::deque<pcl::PointCloud<pcl::PointXYZ> >* buffer1,
@@ -2259,6 +2270,7 @@ rosbag::View::iterator OneSensorCloudsBrass(rosbag::View::iterator it,
   timestamps_1->pop_front();
   // return those two as the current clouds to use
   (*cloud1) = VoxelFilter(cloud_k1);
+  OrientCloud(cloud1);
   *time1 = k1_time;
   return it;
 }
