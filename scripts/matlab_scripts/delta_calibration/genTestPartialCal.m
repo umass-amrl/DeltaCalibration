@@ -1,4 +1,5 @@
-function [t_err, r_err] = genTestPartialCal(N,angle,noise)
+
+function [t_err, r_err,deltas1,deltas2] = genTestPartialCal(N,angle,noise)
 clc;
 A = RandomTransform6D(3.14159, .5)';
 % A = [0 0 1.5 0 0 0 0 0];
@@ -8,9 +9,9 @@ max_delta_translation = 0.2;
 noise_angular = (1.0 *noise) / 180 * pi;
 noise_translation = 0.01 * noise;
 
-A1 = [];
+A1 = [0 0 0 0 0 0 0 0];
 A1I = [];
-A2 = [];
+A2 = [0 0 0 0 0 0 0 0];
 A2I = [];
 A1T = [];
 A2T = [];
@@ -22,6 +23,15 @@ uz = [0 0 1];
 ux = [1 0 0];
 uy = [0 1 0];
 u0 = [0 0 0];
+V1 = [1000 1000 1000 1000 1000 1000];
+V2 = [1000 1000 1000 1000 1000 1000];
+T1 = [0 0 0 0 0 0];
+T2 = [0 0 0 0 0 0];
+empty = [1 1 1 1 1 1];
+last_t1 = [0 0 0 0 0 0];
+last_t2 = [0 0 0 0 0 0];
+time = [0];
+count = 0;
 for i=1:N
   % Canned test. O)ne sensor uncertainty
   % Set 1: x-axis rotation (uncertain x), x-axis rotation (uncertain y),
@@ -64,7 +74,14 @@ for i=1:N
   A2 = [A2; a2y];
   A2 = [A2; a2x];
   A2 = [A2; a2y];
-  
+  tr1 = rotm2aa(aa2rotm(a2x(1:3)') * aa2rotm(last_t1(1:3)'));
+  tt1 = a2x(4:6) + last_t1(4:6)
+  t1 = [tr1 tt1]
+    tr2 = rotm2aa(aa2rotm(a2x(1:3)') * aa2rotm(last_t2(1:3)'));
+  tt2 = a2x(4:6) + last_t2(4:6);
+  t2 = [tr2 tt2];
+  T1 = [T1; t1];
+  T2 = [T2; t2];
   U1t = [U1t ; ux];
   U1t = [U1t ; ux];
   U1t = [U1t ; uy];
@@ -89,6 +106,29 @@ for i=1:N
   U2r = [U2r ; u0];
   U2r = [U2r ; u0];
   
+  last_t1 = t1;
+  last_t2 = t2;
+  T1 = [T1; t1];
+  T2 = [T2; t2];
+  T1 = [T1; t1];
+  T2 = [T2; t2];
+  T1 = [T1; t1];
+  T2 = [T2; t2];
+  T1 = [T1; t1];
+  T2 = [T2; t2];
+  V1 = [V1; empty];
+  V2 = [V2; empty];
+  V1 = [V1; empty];
+  V2 = [V2; empty];
+  V1 = [V1; empty];
+  V2 = [V2; empty];
+  V1 = [V1; empty];
+  V2 = [V2; empty];
+  time = [time; count + 1];
+  time = [time; count + 1];
+  time = [time; count + 1];
+  time = [time; count + 1];
+  
   %A2(end,:) = AddNoiseToTransform6D(A2(end,:)', noise_angular, noise_translation)';
 end
 
@@ -97,6 +137,12 @@ end
 C0 = [A1 A2];
 Ut = [U1t U2t];
 Ur = [U1r U2r];
+deltas1 = A1;
+deltas2 = A2;
+kinectData = struct('folder', '', 'files', [], 'time', time, 'type', 'kinect', 'T_Skm1_Sk', A1(:,1:6), 'T_S1_Sk', T1, 'T_Var_Skm1_Sk', V1, 'T_Var_S1_Sk', V2);
+save('GenKinectData.mat', 'kinectData');
+odomData = struct('folder', '', 'files', [], 'time', time, 'type', 'nav', 'T_Skm1_Sk', A2(:,1:6), 'T_S1_Sk', T2, 'T_Var_Skm1_Sk', V2, 'T_Var_S1_Sk', V2);
+save('GenNavData.mat', 'odomData');
 dlmwrite('generated_deltas.txt', C0, ' ');
 dlmwrite('generated_uncertaintiest.txt', Ut, ' ');
 dlmwrite('generated_uncertaintiesr.txt', Ur, ' ');
