@@ -188,6 +188,10 @@ double ResidualDist(
     const pcl::PointCloud<pcl::Normal>& l_normal,
     double* pose);
 
+Eigen::Matrix<double,4,1> TransformDifference(
+  double* transform_base,
+  double* transform);
+
 double* CombineTransform(double* pose1, double* pose2);
 
 pcl::PointCloud<pcl::PointXYZ> CloudFromObj(string obj);

@@ -21,6 +21,8 @@ ros::Publisher markerArray_pub;
 // Controls usage of normal files
 bool normal_file = false;
 
+namespace delta_calc {
+
 // Signal handler for breaks (Ctrl-C)
 void HandleStop(int i) {
   printf("\nTerminating.\n");
@@ -143,7 +145,7 @@ Eigen::Transform<double, 3, Eigen::Affine> TransformUncertainty(
   return UncertainRotation;
   }
   
-  void StripUncertainty(Vector3d ut, Vector3d ur, double* transform) {
+  void StripUncertainty(const Vector3d& ut, const Vector3d& ur, double* transform) {
     Eigen::Transform<double, 3, Eigen::Affine> R = AAToTransform(transform[0], transform[1], transform[2]);
     Eigen::Transform<double, 3, Eigen::Affine> I = AAToTransform(0.0, 0.0, 0.0);
     vector<double> ur_v = {ur[0], ur[1], ur[2]}; 
@@ -254,7 +256,7 @@ void CalculateDelta(
 }
 
 void ExtractUncertainty(
-    vector<Eigen::Vector4d> normal_equations,
+    const vector<Eigen::Vector4d>& normal_equations,
     Eigen::Vector3d* uncertainty_T,
     Eigen::Vector3d* uncertainty_R) {
   
@@ -266,7 +268,13 @@ void ExtractUncertainty(
     Eigen::Vector3d normal = {normal_equation[0],normal_equation[1], normal_equation[2]};
     if(!first_normal) {
       if(!DoubleEquals(abs(rot_u.dot(normal)), 1)) {
-        trans_u = rot_u.cross(normal);
+        if(DoubleEquals(trans_u.norm(), 0)) {
+          trans_u = rot_u.cross(normal);
+        } else {
+          if(!DoubleEquals(abs(trans_u.dot(normal)), 0)) {
+            trans_u = {0,0,0};
+          }
+        }
         rot_u[0] = 0;
         rot_u[1] = 0;
         rot_u[2] = 0;
@@ -282,10 +290,9 @@ void ExtractUncertainty(
 }
 
 vector<pcl::PointCloud<pcl::PointXYZ> > ExtractPlanes(
-  pcl::PointCloud<pcl::PointXYZ> cloud,
+  const pcl::PointCloud<pcl::PointXYZ>& cloud,
   vector<Eigen::Vector4d>* normal_equations,
-  vector<Eigen::Vector3d>* centroids
-) {
+  vector<Eigen::Vector3d>* centroids) {
   
   vector<pcl::PointCloud<pcl::PointXYZ> > output;
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>),
@@ -314,8 +321,8 @@ vector<pcl::PointCloud<pcl::PointXYZ> > ExtractPlanes(
   double nr_points = (int) cloud_filtered->points.size ();
   // While 10% of the original cloud is still there
   int num_planes = 0;
-  while (nr_points > (.1 * cloud.size()))
-  {
+  while (nr_points > (.1 * cloud.size())) {
+    
     Eigen::Vector4d equation;
     num_planes +=1;
     // Segment the largest planar component from the remaining cloud
@@ -323,7 +330,6 @@ vector<pcl::PointCloud<pcl::PointXYZ> > ExtractPlanes(
     seg.segment (*inliers, *coefficients);
     if (inliers->indices.size () == 0)
     {
-      std::cerr << "Could not estimate a planar model for the given dataset." << std::endl;
       break;
     }
     
@@ -332,15 +338,12 @@ vector<pcl::PointCloud<pcl::PointXYZ> > ExtractPlanes(
     extract.setIndices (inliers);
     extract.setNegative (false);
     extract.filter (*cloud_p);
-    std::cerr << "PointCloud representing the planar component: " << cloud_p->width * cloud_p->height << " data points." << std::endl;
     // Create the filtering object
     extract.setNegative (true);
     extract.filter (*cloud_f);
     cloud_filtered.swap (cloud_f);
     i++;
-//     PublishCloud(*cloud_p, cloud_test_pub);
-//     PublishCloud(*cloud_f, model_cloud_pub);
-//     PublishCloud(*cloud_filtered, bmodel_cloud_pub);
+    nr_points = (int) cloud_filtered->points.size ();
     equation[0] = coefficients->values[0];
     equation[1] = coefficients->values[1];
     equation[2] = coefficients->values[2];
@@ -792,7 +795,7 @@ void DeltaCalculationSlam(string bag_name,
   }
   // If the residual distance between either of these clouds (unmodified) and
   // the clouds k - 1 is large enough continue (otherwise read in new clouds)
-  double k1_calculated_delta[6];
+//   double k1_calculated_delta[6];
   double k2_calculated_delta[6];
   
   // Check the residual distance against threshold
@@ -1314,41 +1317,50 @@ rosbag::View::iterator ClosestOdom(rosbag::View::iterator it,
     return it;
 }
 
+
 double* DeltaFromOdom(const vector<double>& current, 
                       const vector<double>& previous) {
+  
   Eigen::Transform<double, 3, Eigen::Affine> current_transform;
   Eigen::Transform<double, 3, Eigen::Affine> previous_transform;
   // For the two poses create a transform
   double* posek = new double[6];
   
   Eigen::Vector3d cur_translation;
-  cur_translation[0] = current[1];
-  cur_translation[1] = current[2];
-  cur_translation[2] = current[3];
+  cur_translation[0] = current[4];
+  cur_translation[1] = current[5];
+  cur_translation[2] = current[6];
   
-    // Build the affine transforms for the previous pose
-  Eigen::Quaternion<double> previous_quat(previous[7], previous[4], previous[5], previous[6]);
+  // Build the affine transforms for the previous pose
+  Eigen::Quaternion<double> previous_quat(previous[3], previous[0], previous[1], previous[2]);
   Eigen::Translation<double, 3> previous_translation =
-      Eigen::Translation<double, 3>(previous[1], previous[2], previous[3]);
+  Eigen::Translation<double, 3>(previous[4], previous[5], previous[6]);
   
   // Build the affine transforms based on the current pose
-  Eigen::Quaternion<double> current_quat(current[7], current[4], current[5], current[6]);
+  Eigen::Quaternion<double> current_quat(current[3], current[0], current[1], current[2]);
+  
   // Calculate delta rotation
   Eigen::Quaternion<double> rotation = previous_quat.inverse() * current_quat;
-  // Calculate Delta Translation
-  cur_translation = (previous_quat * current_quat.inverse() * cur_translation);
+  
   Eigen::Translation<double, 3> translation =
   Eigen::Translation<double, 3>(-cur_translation[0] + previous_translation.x(), -cur_translation[1] + previous_translation.y(), -cur_translation[2] + previous_translation.z());
   Eigen::Transform<double, 3, Eigen::Affine> transform =
-      translation * rotation;
-      
+  translation * rotation;
+  
   transform = transform.inverse();
- 
-      
+  Eigen::AngleAxis<double> test(transform.rotation());
+  // Get the axis
+  Eigen::Vector3d test_axis = test.axis();
+  // Recompute the rotation angle
+  double test_angle = test.angle();
+  Eigen::Vector3d test_trans = test_axis * test_angle;
+  cout << test_trans[0] << " " << test_trans[1] << " " << test_trans[2] << endl;
+  transform = transform;
+  
   // Find the rotation component
   // Find the angle axis format
-      Eigen::AngleAxis<double> angle_axis(transform.rotation());
-  
+  Eigen::AngleAxis<double> angle_axis(transform.rotation());
+  Eigen::Quaternion<double> final_quat(transform.rotation());
   // Get the axis
   Eigen::Vector3d normal_axis = angle_axis.axis();
   
@@ -1359,24 +1371,20 @@ double* DeltaFromOdom(const vector<double>& current,
   // Compute Translation
   Eigen::Translation<double, 3> combined_translation(
     transform.translation());
+  Eigen::Vector3d combined_trans = {combined_translation.x(), combined_translation.y(), combined_translation.z()};
+  combined_trans = current_quat.inverse() * combined_trans;
+  posek[3] = -combined_trans[0];
+  posek[4] = -combined_trans[1];
+  posek[5] = -combined_trans[2];
   
-  cout << "Current translation" << endl;
-  cout << current[1] << " " << current[2] << " " << current[3] << endl;
-  cout << "combined Translation" << endl;
-  cout << combined_translation.x() << " " << combined_translation.y() << " " << combined_translation.z() <<  endl;
-  cout << "Previous translation" << endl;
-  cout << previous_translation.x() << " " << previous_translation.y() << " " << previous_translation.z() <<  endl;
-  posek[3] = combined_translation.x();
-  posek[4] = combined_translation.y();
-  posek[5] = combined_translation.z();
-  cout << "Delta translation" << endl;
-  cout << posek[3] << " " << posek[4] << " " << posek[5] << " " << endl;
   // Recompute the rotation angle
-  posek[0] = combined_axis(0);
-  posek[1] = combined_axis(1);
-  posek[2] = combined_axis(2);
+  posek[0] = combined_axis[0];
+  posek[1] = combined_axis[1];
+  posek[2] = combined_axis[2];
+
   return posek;
 }
+                      
 
 void DeltaCalculationOdometry(string bag_name,
                               vector<ros::Publisher> publishers,
@@ -1584,7 +1592,7 @@ void DeltaCalculationBrass(string bag_name,
   
   // While there are still clouds in both datasets
   while(((variables->k1_buffer.size() != 0)
-    || (bag_it != variables->end))) {
+    || (bag_it != variables->end)) && (odom_it != odom_end) ) {
     count += 1;
   
   cout << "Frame: " << count << endl;
@@ -1724,70 +1732,4 @@ void DeltaCalculationBrass(string bag_name,
     }
     keyframe_bag.close();
 }
-
-int main(int argc, char **argv) {
-  signal(SIGINT,HandleStop);
-  signal(SIGALRM,HandleStop);
-
-  int max_clouds = INT_MAX;
-  int max_delta_degrees = 0;
-  char* bag_file = (char*)"pair_upright.bag";
-  int mode = 0;
-  bool normal_mode = false;
-  // Parse arguments.
-  static struct poptOption options[] = {
-    { "max-clouds" , 'k', POPT_ARG_INT , &max_clouds ,0, "Max Clouds" , "NUM" },
-    { "delta" , 'd', POPT_ARG_INT , &max_delta_degrees ,0, "Angular Change" ,
-        "NUM" },
-    { "bag-file" , 'B', POPT_ARG_STRING, &bag_file ,0, "Process bag file" ,
-        "STR" },
-    { "mode-mode", 'M', POPT_ARG_NONE, &mode, 0, "Selec input mode",
-        "NONE" },
-    POPT_AUTOHELP
-    { NULL, 0, 0, NULL, 0, NULL, NULL }
-  };
-
-  // parse options
-  POpt popt(NULL,argc,(const char**)argv,options,0);
-  int c;
-  while((c = popt.getNextOpt()) >= 0) {
-  }
-  // Print option values
-  printf("Max Frames: %d\nBagfile: %s\nDelta Size: %d deg\n",
-         max_clouds,
-         bag_file,
-         max_delta_degrees);
-
-  // Initialize Ros
-  ros::init(argc, argv, "delta_calibration",
-  ros::init_options::NoSigintHandler);
-  ros::NodeHandle n;
-  //----------  Setup Publishers ----------
-  cloud_pub_1 = n.advertise<sensor_msgs::PointCloud2> ("cloud_pub_1", 1);
-  cloud_pub_2 = n.advertise<sensor_msgs::PointCloud2> ("cloud_pub_2", 1);
-  cloud_pub_3 = n.advertise<sensor_msgs::PointCloud2> ("cloud_pub_3", 1);
-  cloud_pub_4 = n.advertise<sensor_msgs::PointCloud2> ("cloud_pub_4", 1);
-  vector<ros::Publisher> publishers;
-  publishers.push_back(cloud_pub_1);
-  publishers.push_back(cloud_pub_2);
-  publishers.push_back(cloud_pub_3);
-  publishers.push_back(cloud_pub_4);
-  marker_pub =
-  n.advertise<visualization_msgs::Marker>("visualization_marker", 10);
-  markerArray_pub =
-  n.advertise<visualization_msgs::MarkerArray>(
-      "visualization_marker_array", 10);
-
-  if (mode == 0) {
-    DeltaCalculation(bag_file, publishers, max_delta_degrees, 
-                     max_clouds);
-  } else if(mode == 1) {
-    cout << "Brass Delta Calculation" << endl;
-    DeltaCalculationBrass(bag_file, publishers, max_delta_degrees, 
-                             max_clouds);
-  } else {
-    DeltaCalculationSingle(bag_file, publishers, max_delta_degrees, 
-                           max_clouds);
-  }
-  return 0;
 }

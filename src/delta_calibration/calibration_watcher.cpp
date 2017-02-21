@@ -14,12 +14,14 @@
 #include <actionlib/client/simple_action_client.h>
 #include <rosbag/bag.h>
 #include <pthread.h>
+#include<delta_calc.h>
+#include<partial_calibrate.h>
 
 ros::Publisher ground_error_pub;
 ros::Publisher calibration_error_pub;
-ros::Publisher cloud_pub_1;
-ros::Publisher cloud_pub_2;
-ros::Publisher cloud_pub_3;
+ros::Publisher cloudx_pub_1;
+ros::Publisher cloudx_pub_2;
+ros::Publisher cloudx_pub_3;
 ros::Publisher image_pub;
 ros::Publisher cancel_pub;
 ros::Publisher move_pub;
@@ -42,7 +44,7 @@ pcl::PointCloud<pcl::PointXYZ> global_cloud;
 pcl::PointCloud<pcl::PointXYZ> last_cloud;
 double global_min;
 typedef actionlib::SimpleActionClient<frontier_exploration::ExploreTaskAction> Client;
-enum Mode{monitor, record, record_rot, record_trans, find_scene};
+enum Mode{monitor, record, record_rot, record_trans, find_scene, calibrate};
 
 Mode mode = monitor;
 vector<vector<double> > moves;
@@ -85,7 +87,43 @@ bool DoubleEquals(double x, double y) {
 
 bool DoubleEquals2(double x, double y) {
 //   cout << fabs(x-y) << endl;
-  return fabs(x-y) < .1;
+  return fabs(x-y) < .05;
+}
+
+double* Quat2AA(double* quat) {
+  double qw = quat[3];
+  double qx = quat[0];
+  double qy = quat[1];
+  double qz = quat[2];
+  double angle = 2 * acos(qw);
+  double x;
+  double y;
+  double z;
+  if (qw != 1) {
+    x = qx / sqrt(1-qw*qw);
+    y = qy / sqrt(1-qw*qw);
+    z = qz / sqrt(1-qw*qw);
+  }
+  else {
+      x = qx;
+      y = qy;
+      z = qz;
+  }
+  double* aa = new double[7];
+  aa[0] = angle * x;
+  aa[1] = angle * y;
+  aa[2] = angle * z;
+  aa[3] = quat[4];
+  aa[4] = quat[5];
+  aa[5] = quat[6];
+  return aa;
+}
+
+void PrintPose(double* pose){
+  for(uint i = 0; i < 6; i ++) {
+    cout << pose[i] << " ";
+  }
+  cout << endl;
 }
 
 double* DeltaFromOdom(double* current, 
@@ -107,12 +145,12 @@ double* DeltaFromOdom(double* current,
   
   // Build the affine transforms based on the current pose
   Eigen::Quaternion<double> current_quat(current[3], current[0], current[1], current[2]);
+  
   // Calculate delta rotation
   Eigen::Quaternion<double> rotation = previous_quat.inverse() * current_quat;
+  
   Eigen::Quaternion<double> extrinsic_quat(extrinsics[3], extrinsics[0], extrinsics[1], extrinsics[2]);
-//   rotation = extrinsic_quat.inverse() * rotation;
-  // Calculate Delta Translation
-//   cur_translation = (previous_quat * current_quat.inverse() * cur_translation);
+  
   Eigen::Translation<double, 3> translation =
   Eigen::Translation<double, 3>(-cur_translation[0] + previous_translation.x(), -cur_translation[1] + previous_translation.y(), -cur_translation[2] + previous_translation.z());
   Eigen::Transform<double, 3, Eigen::Affine> transform =
@@ -127,7 +165,6 @@ double* DeltaFromOdom(double* current,
   Eigen::Vector3d test_trans = test_axis * test_angle;
   cout << test_trans[0] << " " << test_trans[1] << " " << test_trans[2] << endl;
   transform = transform;
-//     rotation = rotation.inverse();
       
   // Find the rotation component
   // Find the angle axis format
@@ -139,42 +176,21 @@ double* DeltaFromOdom(double* current,
   // Recompute the rotation angle
   double combined_angle = angle_axis.angle();
   Eigen::Vector3d combined_axis = normal_axis * combined_angle;
-  combined_axis = extrinsic_quat * combined_axis;
+  
   // Compute Translation
   Eigen::Translation<double, 3> combined_translation(
     transform.translation());
   Eigen::Vector3d combined_trans = {combined_translation.x(), combined_translation.y(), combined_translation.z()};
-  combined_trans = extrinsic_quat * combined_trans;
-//   combined_translation = extrinsic_quat * combined_translation;
-//   cout << "Current translation" << endl;
-//   cout << current[1] << " " << current[2] << " " << current[3] << endl;
-//   cout << "combined Translation" << endl;
-//   cout << combined_translation.x() << " " << combined_translation.y() << " " << combined_translation.z() <<  endl;
-//   cout << "Previous translation" << endl;
-//   cout << previous_translation.x() << " " << previous_translation.y() << " " << previous_translation.z() <<  endl;
-  posek[3] = combined_trans[0];
-  posek[4] = combined_trans[1];
-  posek[5] = combined_trans[2];
-//   cout << "Delta translation" << endl;
+  combined_trans = current_quat.inverse() * combined_trans;
+  posek[3] = -combined_trans[0];
+  posek[4] = -combined_trans[1];
+  posek[5] = -combined_trans[2];
 
   // Recompute the rotation angle
   posek[0] = combined_axis[0];
   posek[1] = combined_axis[1];
   posek[2] = combined_axis[2];
-//   posek[3] = combined_axis[0];
-  
-//   posek[3] = 0;
-//   posek[4] = 0;
-//   posek[5] = 0;
-// //   cout << "Delta translation" << endl;
-// 
-//   // Recompute the rotation angle
-//   posek[0] = 0;
-//   posek[1] = 0;
-//   posek[2] = 1.57;
-  cout << posek[0] << " " << posek[1] << " " << posek[2] << " ";
-    cout << posek[3] << " " << posek[4] << " " << posek[5] << " " << endl;
-//   cout << final_quat.x() << " " << final_quat.y() << " " << final_quat.z() << " " << final_quat.w() << endl;
+
   return posek;
 }
 
@@ -209,51 +225,105 @@ void CheckCalibration() {
   calibration_error_pub.publish(error_msg);
 }
 
+//This name is terrible, fix it Jarrett
+double* TransformTransform(double* base_transform, double* transform) {
+  //Create the eigen transform from the first pose
+  Eigen::Matrix<double,3,1> axis(transform[0], transform[1], transform[2]);
+  const double angle = axis.norm();
+  if(angle != 0) {
+    axis = axis / angle;
+  }
+  Eigen::Transform<double, 3, Eigen::Affine> rotation =
+  Eigen::Transform<double, 3, Eigen::Affine>(Eigen::AngleAxis<double>(
+    angle, axis));
+  
+  Eigen::Matrix<double,3,1> axis2(base_transform[0], base_transform[1], base_transform[2]);
+  const double angle2 = axis2.norm();
+  if(angle2 != 0) {
+    axis2 = axis2 / angle2;
+  }
+  Eigen::Transform<double, 3, Eigen::Affine> rotation2 =
+  Eigen::Transform<double, 3, Eigen::Affine>(Eigen::AngleAxis<double>(
+    angle2, axis2));
+  
+  // T2 = R^-1 (R_1T + T_1 - T)
+  Vector3d ext_tran = {transform[3], transform[4], transform[5]};
+  Vector3d rot_vec = {base_transform[0], base_transform[1], base_transform[2]};
+  Vector3d trans_vec = {base_transform[3], base_transform[4], base_transform[5]};
+  rot_vec = rotation.inverse() * rot_vec;
+  trans_vec = trans_vec + (rotation2 * ext_tran) - ext_tran;
+  trans_vec = rotation.inverse() * trans_vec;
+  double* ret_val = new double[6];
+  ret_val[0] = rot_vec[0];
+  ret_val[1] = rot_vec[1];
+  ret_val[2] = rot_vec[2];
+  ret_val[3] = trans_vec[0];
+  ret_val[4] = trans_vec[1];
+  ret_val[5] = trans_vec[2];
+  return ret_val;
+}
+
 void DeltaErr() {
-  if(DoubleEquals2(cloud_time, odom_time) && DoubleEquals2(cloud_time_last, odom_time_last)) {
-    cout << endl;
-    cout << std::setprecision(20) << cloud_time << endl;
-    cout << std::setprecision(20) << odom_time << endl;
-//     cout << "Last Pose" << endl;
-//     cout << last_pose[0] << " " << last_pose[1] << " " << last_pose[2] << " ";
-//     cout << last_pose[3] << " " << last_pose[4] << " " << last_pose[5] << " " << endl;
-//     cout << "Current Pose" << endl;
-//     cout << current_pose[0] << " " << current_pose[1] << " " << current_pose[2] << " ";
-//     cout << current_pose[3] << " " << current_pose[4] << " " << current_pose[5] << " " << endl;
-    double* transform = DeltaFromOdom(current_pose, last_pose);
+  
+  if(DoubleEquals2(cloud_time, odom_time) && DoubleEquals2(cloud_time_last, odom_time_last)) {  
+    
+    double* transform = DeltaFromOdom(last_pose, current_pose);
     pcl::PointCloud<pcl::PointXYZ> cloud = last_cloud;
     pcl::PointCloud<pcl::Normal> normals_1 = GetNormals(cloud);
     pcl::PointCloud<pcl::Normal> normals_2 = GetNormals(global_cloud);
-//     double dist = ResidualDist(cloud, global_cloud, normals_1, normals_2, transform);
-    
-    TransformPointCloud(&cloud, transform);
+    double* ext = Quat2AA(extrinsics);
+    double* combined = TransformTransform(transform, ext);
+    TransformPointCloud(&cloud, combined);
     vector<int > nearest_neigbors;
     vector<int > start_points;
-    // mean += KdTreeNN_normal(base_cloud, transformed_cloud, normals[k],
-    //     normals[l],
-    // nearest_neigbors, start_points);
-    // Reverse order nearest neighbor to make sure we're transforming in the right
-    // direction
-    //cout << "Finding Neighbors" << endl;
     vector<Eigen::Vector2d> image_coords_1;
     vector<Eigen::Vector2d> image_coords_2;
-    double dist = KdTreeNN(.5,
-            cloud,
-            global_cloud,
-            normals_1,
-            normals_2,
-            image_coords_1,
-            image_coords_2,
-            nearest_neigbors,
-            start_points);
-    cout << dist << endl;
-    PublishCloud(cloud, cloud_pub_1);
-    PublishCloud(last_cloud, cloud_pub_3);
-    PublishCloud(global_cloud, cloud_pub_2);
-  } else {
-    pcl::PointCloud<pcl::PointXYZ> empty;
-    PublishCloud(empty, cloud_pub_1);
-    PublishCloud(empty, cloud_pub_2);
+    double* calculated_delta = new double[6];
+    // Initialize transform ARRAYS
+    vector<double> pose0(6, 0.0);
+    std::copy(pose0.begin(), pose0.end(), calculated_delta);
+    vector<Eigen::Vector2d> empty_coords;
+    vector<ros::Publisher> publishers;
+    publishers.push_back(cloudx_pub_1);
+    publishers.push_back(cloudx_pub_2);
+    publishers.push_back(cloudx_pub_3);
+    ICP (10,
+       .05,
+       publishers,
+       "",
+       "",
+       last_cloud,
+       global_cloud,
+       normals_1,
+       normals_2,
+       empty_coords,
+       empty_coords,
+       calculated_delta,
+       NULL);
+    vector<Eigen::Vector4d> plane_normals;
+    vector<Eigen::Vector3d> plane_centroids;
+    delta_calc::ExtractPlanes(cloud, &plane_normals, &plane_centroids);
+    
+    Eigen::Vector3d uncertainty_t;
+    Eigen::Vector3d uncertainty_r;
+    delta_calc::ExtractUncertainty(plane_normals, &uncertainty_t, &uncertainty_r);
+    delta_calc::StripUncertainty(uncertainty_t, uncertainty_r, calculated_delta);
+    delta_calc::StripUncertainty(uncertainty_t, uncertainty_r, combined);
+
+    Eigen::Matrix<double, 4, 1> error = TransformDifference(combined, calculated_delta);
+    const unsigned int data_sz = 4;
+    std_msgs::Float32MultiArray m;
+    
+    m.layout.dim.push_back(std_msgs::MultiArrayDimension());
+    m.layout.dim[0].size = data_sz;
+    
+    // only needed if you don't want to use push_back
+    m.data.resize(data_sz);
+    m.data[0] = error[0];
+    m.data[1] = error[1];
+    m.data[2] = error[2];
+    m.data[3] = error[3];
+    calibration_error_pub.publish(m);
   }
 }
 
@@ -308,30 +378,39 @@ void OrientCloud(pcl::PointCloud<pcl::PointXYZ>* cloud) {
 }
 
 void CheckGroundPlane(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud) {
-  pcl::PointXYZ min, max;
-  pcl::getMinMax3D(pcl_cloud, min, max);
   
-  min.x = 0;
-  min.y = 0;
-  // Get neighbors of lowest point
-  int K = 50;
-  std::vector<int> neighbor_indices = GetNeighborsPCL(pcl_cloud, min, K);
+  // Extract Planes
+  vector<Eigen::Vector4d> plane_normals;
+  vector<Eigen::Vector3d> plane_centroids;
+  delta_calc::ExtractPlanes(pcl_cloud, &plane_normals, &plane_centroids);
   
-  // Calculate the normal for the lowest point
-  Eigen::Vector4f plane_parameters;
-  float curvature;
-  pcl::computePointNormal(pcl_cloud, neighbor_indices, plane_parameters, curvature);
-  
+  // Get Lowest Plane
+  double lowest_value = 500;
+  Eigen::Vector4d ground_normal;
+  for(size_t i = 0; i < plane_centroids.size(); ++i) {
+      if(plane_centroids[i][2] < lowest_value) {
+        lowest_value = plane_centroids[i][2];
+        ground_normal = plane_normals[i];
+      }
+  }
   
   // Compare that normal to the z normal
   Eigen::Vector3d z_axis = {0, 0, 1};
-  Eigen::Vector3d normal_axis = {plane_parameters[0], plane_parameters[1], plane_parameters[2]};
+  Eigen::Vector3d normal_axis = {ground_normal[0], ground_normal[1], ground_normal[2]};
   double angle = VectorAngle(z_axis, normal_axis);
-  
+  double offset = 0 - lowest_value;
   // Take the angle between the two and publish it as the error
-  std_msgs::Float32 error_msg;
-  error_msg.data = angle;
-  ground_error_pub.publish(error_msg);
+  const unsigned int data_sz = 2;
+  std_msgs::Float32MultiArray m;
+  
+  m.layout.dim.push_back(std_msgs::MultiArrayDimension());
+  m.layout.dim[0].size = data_sz;
+  
+  // only needed if you don't want to use push_back
+  m.data.resize(data_sz);
+  m.data[0] = angle;
+  m.data[1] = offset;
+  ground_error_pub.publish(m);
 }
 
 void MakeMove(vector<double> move) {
@@ -554,14 +633,11 @@ void CheckSceneInformation(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud) {
   }
 }
 
-void RecordDepth(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud) {
-  sensor_msgs::PointCloud2 msg;
-  pcl::PCLPointCloud2 pcl_pc2;
-  pcl::toROSMsg(pcl_cloud, msg);
+void RecordDepth(sensor_msgs::PointCloud2 msg) {
   if(mode == record_rot) {
-    rot_bag.write("camera/depth/points", ros::Time::now(), msg);
+    rot_bag.write("/camera/depth/points", ros::Time::now(), msg);
   } else if(mode == record_trans) {
-    trans_bag.write("camera/depth/points", ros::Time::now(), msg);
+    trans_bag.write("/camera/depth/points", ros::Time::now(), msg);
   }
 }
 
@@ -605,9 +681,7 @@ void DepthCb(sensor_msgs::PointCloud2 msg) {
   TransformPointCloudQuat(pcl_cloud, extrinsics);
   TransformPointCloudQuat(pcl_cloud, current_pose);
   
-  
-  
-//   PublishCloud(pcl_cloud, cloud_pub_1);
+//   PublishCloud(pcl_cloud, cloudx_pub_1);
   
   
   if(mode == monitor) {
@@ -634,12 +708,30 @@ void DepthCb(sensor_msgs::PointCloud2 msg) {
       }
       CheckSceneInformation(pcl_cloud);
     } else {
-      // Calibrate here
-//       UnsetInfo();
-      mode = monitor;
+      rot_bag.close();
+      trans_bag.close();
+      vector<ros::Publisher> publishers;
+      publishers.push_back(cloudx_pub_1);
+      publishers.push_back(cloudx_pub_2);
+      publishers.push_back(cloudx_pub_3);
+      publishers.push_back(cloudx_pub_3);
+      publishers.push_back(cloudx_pub_3);
+      publishers.push_back(cloudx_pub_3);
+      publishers.push_back(cloudx_pub_3);
+      cout << "Calculating Deltas" << endl;
+      delta_calc::DeltaCalculationBrass("recorded_data_trans",
+                              publishers,
+                              0,
+                              INT_MAX);
+      delta_calc::DeltaCalculationBrass("recorded_data_rot",
+                              publishers,
+                              1,
+                              INT_MAX);
+      partial_calibrate::turtlebot_calibrate("recorded_data");
+      
     }
   } else if (mode == record_rot || mode == record_trans) {
-    RecordDepth(pcl_cloud);
+    RecordDepth(msg);
   }
 }
 
@@ -662,19 +754,9 @@ void OdomCb(const nav_msgs::Odometry& msg) {
 void CommandCb(const std_msgs::String::ConstPtr& msg)
 {
   ROS_INFO("I heard: [%s]", msg->data.c_str());
-  string scene_find = "find_scene";
+  string scene_find = "recalibrate";
   if(scene_find.compare(msg->data.c_str()) == 0) {
     mode = find_scene;
-    flag_stopped = false;
-    Client client("explore_server", true);
-    client.waitForServer();
-    frontier_exploration::ExploreTaskGoal goal;
-    goal.explore_center.point.x = 0;
-    goal.explore_center.point.y = 0;
-    goal.explore_center.point.z = 0;
-    goal.explore_center.header.frame_id = "/odom";
-    goal.explore_boundary.header.frame_id = "/odom";
-    client.sendGoal(goal);
   }
 }
 
@@ -711,18 +793,18 @@ int main(int argc, char **argv) {
   trans_bag.open("recorded_data_trans.bag", rosbag::bagmode::Write);
   rot_bag.close();
   trans_bag.close();
-  ground_error_pub = n.advertise<std_msgs::Float32>("/calibration/ground_plane_error", 1000);
+  ground_error_pub = n.advertise<std_msgs::Float32MultiArray>("/calibration/ground_plane_error", 1000);
   calibration_error_pub = n.advertise<std_msgs::Float32MultiArray>("/calibration/calibration_error", 1000);
-  cloud_pub_1 = n.advertise<sensor_msgs::PointCloud2> ("cloud_pub_1", 1);
-  cloud_pub_2 = n.advertise<sensor_msgs::PointCloud2> ("cloud_pub_2", 1);
-  cloud_pub_3 = n.advertise<sensor_msgs::PointCloud2> ("cloud_pub_3", 1);
+  cloudx_pub_1 = n.advertise<sensor_msgs::PointCloud2> ("cloud_pub_1", 1);
+  cloudx_pub_2 = n.advertise<sensor_msgs::PointCloud2> ("cloud_pub_2", 1);
+  cloudx_pub_3 = n.advertise<sensor_msgs::PointCloud2> ("cloud_pub_3", 1);
   image_pub = n.advertise<sensor_msgs::Image> ("image_pub", 1);
   cancel_pub = n.advertise<actionlib_msgs::GoalID> ("/explore_server/cancel", 1);
   move_pub = n.advertise<geometry_msgs::PoseStamped> ("/move_base_simple/goal", 1);
   velocity_pub = n.advertise<geometry_msgs::Twist> ("/mobile_base/commands/velocity", 1);
   ros::Subscriber depth_sub = n.subscribe("/camera/depth/points", 1, DepthCb);
   ros::Subscriber odom_sub = n.subscribe("/odom", 1, OdomCb);
-  ros::Subscriber command_sub = n.subscribe("/calibration_commands", 1, CommandCb);
+  ros::Subscriber command_sub = n.subscribe("/calibration/commands", 1, CommandCb);
   ros::Subscriber status_sub = n.subscribe("/move_base/status", 1, StatusCb);
   current_pose[0] = 0;
   current_pose[1] = 0;
