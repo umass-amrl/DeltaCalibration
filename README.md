@@ -21,7 +21,8 @@ If dependences are not installed (still installs some unnecessary dependencies)
 mkdir build
 make
 ```
-USAGE:
+###USAGE:
+
 Start calibration watcher
 
 ```bash
