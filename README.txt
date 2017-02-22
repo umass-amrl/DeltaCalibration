@@ -5,20 +5,21 @@ DeltaCalibration calculates delta-transforms given input bagfiles of kinect dept
 COMPILATION:
 Modify .bashrc and include libraries and ros scripts as follows: WARNING: In ubuntu, make sure the lines are entered before the "interactive terminal" check!
 
-```bash
+```
 source <ROS DIRECTORY>/setup.bash
 export ROS_PACKAGE_PATH=~/cobot:$ROS_PACKAGE_PATH
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 ```
 
 If dependences are not installed (still instaqll some unnecessary dependencies)
-```bash
+
+```
 ./InstallPackages
 ./InstallResearchPackages
 ```
 Compile 
 
-```bash
+```
 mkdir build
 make
 ```
