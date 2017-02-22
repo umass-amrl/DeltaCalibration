@@ -6,19 +6,33 @@ DeltaCalibration calculates delta-transforms given input bagfiles of kinect dept
 
 Modify .bashrc and include libraries and ros scripts as follows: WARNING: In ubuntu, make sure the lines are entered before the "interactive terminal" check!
 
+```bash
 source <ROS DIRECTORY>/setup.bash
 export ROS_PACKAGE_PATH=~/cobot:$ROS_PACKAGE_PATH
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+```
 
+If dependences are not installed (still installs some unnecessary dependencies)
 
-If dependences are not installed (still instaqll some unnecessary dependencies)
-
-
+```bash
 ./InstallPackages
 ./InstallResearchPackages
 
 mkdir build
 make
-
+```
 USAGE:
-Detailed instructions to come
+Start calibration watcher
+
+```bash
+./bin/calibration_watcher
+```
+
+Calibration watcher publishes several topics with information about the current estimate of miscalibration. 
+
+topic: /calibration/ground_plane_error type: std_msgs::Float32MultiArray content: [0] = rotational error in radians [1] = translation error in meters
+
+topic: /calibration/calibration_error type: std_msgs::Float32MultiArray content [0] = rot error in radians [1] = rot_err / total_rotation [2] = translation error in meters [3] = trans_error / total_translation
+
+to trigger recalibration
+publish 'recalibrate' on /calibration/commands - (will eventually have two calibration options)
