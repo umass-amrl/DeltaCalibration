@@ -8,7 +8,7 @@ Modify .bashrc and include libraries and ros scripts as follows: WARNING: In ubu
 
 ```bash
 source <ROS DIRECTORY>/setup.bash
-export ROS_PACKAGE_PATH=~/cobot:$ROS_PACKAGE_PATH
+export ROS_PACKAGE_PATH=~/DeltaCalibration:$ROS_PACKAGE_PATH
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 ```
 
