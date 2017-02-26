@@ -11,8 +11,8 @@ namespace icp {
 
 bool first_nn = true;
 int count = 0;
-const float nn_dist = .01;
-float neighbor_dist = .01;
+const float nn_dist = .05;
+float neighbor_dist = .05;
 vector<int> x_pos;
 vector<int> y_pos;
 
@@ -22,7 +22,7 @@ bool DoubleEquals(double x, double y) {
 }
 
 bool HistogramEquals(double x, double y) {
-  return fabs(x-y) < .001;
+  return fabs(x-y) < .0001;
 }
 
 void PublishCloud(
@@ -172,6 +172,68 @@ template <class T> Eigen::Matrix<T,3,1> VectorTranslate(
       transformed_point[1],
       transformed_point[2]));
 }
+
+Eigen::Matrix<double,4,1> TransformDifference(
+  double* transform_base,
+  double* transform) {
+  
+  Eigen::Matrix<double,4,1> output;
+  //Create the eigen transform from the first pose
+  Eigen::Matrix<double,3,1> axis(transform[0], transform[1], transform[2]);
+  const double angle = axis.norm();
+  if(angle != double(0)) {
+    axis = axis / angle;
+  }
+  Eigen::Transform<double, 3, Eigen::Affine> rotation =
+  Eigen::Transform<double, 3, Eigen::Affine>(Eigen::AngleAxis<double>(
+    angle, axis));
+  
+  Eigen::Translation<double, 3> translation =
+  Eigen::Translation<double, 3>(transform[3], transform[4], transform[5]);
+  Vector3d trans = {transform[3], transform[4], transform[5]};
+  Eigen::Transform<double, 3, Eigen::Affine> affine_transform =
+  translation * rotation;
+  
+  //Create the eigen transform from the second pose
+  Eigen::Matrix<double,3,1> axis_base(transform_base[0], transform_base[1], transform_base[2]);
+  const double angle_base = axis_base.norm();
+  if(angle_base != double(0)) {
+    axis_base = axis_base / angle_base;
+  }
+  Eigen::Transform<double, 3, Eigen::Affine> rotation_base =
+  Eigen::Transform<double, 3, Eigen::Affine>(Eigen::AngleAxis<double>(
+    angle_base, axis_base));
+  
+  Eigen::Translation<double, 3> translation_base =
+  Eigen::Translation<double, 3>(transform_base[3], transform_base[4], transform_base[5]);
+  
+  Eigen::Transform<double, 3, Eigen::Affine> affine_transform_base =
+  translation_base * rotation_base;
+  
+  Eigen::Transform<double, 3, Eigen::Affine> difference =
+  affine_transform.inverse() * affine_transform_base;
+  
+  // Find the rotation component
+  // Find the angle axis format
+  Eigen::AngleAxis<double> angle_axis(difference.rotation());
+  
+  // Get the axis
+//   Eigen::Vector3d normal_axis = angle_axis.axis();
+  
+  // Recompute the rotation angle
+  double combined_angle = angle_axis.angle();
+  // Compute Translation
+  Eigen::Matrix<double, 3,1> combined_translation(
+    difference.translation());
+  output[0] = combined_angle;
+  output[1] = combined_angle / angle;
+  output[2] = combined_translation.norm();
+  output[3] = (double)combined_translation.norm() / trans.norm();
+ 
+  
+  
+  return output;
+  }
 
 
 // Transforms a given eigen point by the given transform (array input)
@@ -2243,6 +2305,17 @@ rosbag::View::iterator OneSensorClouds(rosbag::View::iterator it,
   return it;
 }
 
+void OrientCloud(pcl::PointCloud<pcl::PointXYZ>* cloud) {
+  for(size_t i = 0; i < cloud->size(); ++i) {
+    pcl::PointXYZ point = (*cloud)[i];
+    pcl::PointXYZ point2;
+    point2.x = point.z;
+    point2.y = -point.x;
+    point2.z = -point.y;
+    (*cloud)[i] = point2;
+  }
+}
+
 rosbag::View::iterator OneSensorCloudsBrass(rosbag::View::iterator it,
                                          rosbag::View::iterator end,
                                          std::deque<pcl::PointCloud<pcl::PointXYZ> >* buffer1,
@@ -2259,6 +2332,7 @@ rosbag::View::iterator OneSensorCloudsBrass(rosbag::View::iterator it,
   timestamps_1->pop_front();
   // return those two as the current clouds to use
   (*cloud1) = VoxelFilter(cloud_k1);
+  OrientCloud(cloud1);
   *time1 = k1_time;
   return it;
 }

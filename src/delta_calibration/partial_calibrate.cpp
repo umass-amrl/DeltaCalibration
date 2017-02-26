@@ -1,22 +1,16 @@
-//----------- INCLUDES
-#include <nav_msgs/Odometry.h>
-#include "delta_calibration/icp.h"
 
-using std::size_t;
-using std::vector;
-using namespace std;
-using namespace icp;
-using Eigen::Vector3d;
+#include "delta_calibration/partial_calibrate.h"
 
-//Intialize empty publishers
-ros::Publisher cloud_pub_1;
-ros::Publisher cloud_pub_2;
-ros::Publisher cloud_pub_3;
-ros::Publisher cloud_pub_4;
+// //Intialize empty publishers
+// ros::Publisher cloud_pub_1;
+// ros::Publisher cloud_pub_2;
+// ros::Publisher cloud_pub_3;
+// ros::Publisher cloud_pub_4;
+// 
+// ros::Publisher marker_pub;
+// ros::Publisher markerArray_pub;
 
-ros::Publisher marker_pub;
-ros::Publisher markerArray_pub;
-
+namespace partial_calibrate {
 // Signal handler for breaks (Ctrl-C)
 void HandleStop(int i) {
   printf("\nTerminating.\n");
@@ -205,6 +199,8 @@ struct PartialRotationErrorNumeric {
  const vector<double> u2;
 };
 
+
+
 struct PartialTranslationErrorNumeric {
   PartialTranslationErrorNumeric(const vector<double>& delta_1,
                        const vector<double>& delta_2,
@@ -227,8 +223,8 @@ struct PartialTranslationErrorNumeric {
     AAToTransform(transform[0], transform[1], transform[2]);
     Eigen::Transform<double, 3, Eigen::Affine> q1 = 
         AAToTransform(double(delta_1[0]), double(delta_1[1]), double(delta_1[2]));
-        Eigen::Transform<double, 3, Eigen::Affine> q2 = 
-        AAToTransform(double(delta_2[0]), double(delta_2[1]), double(delta_2[2]));
+//         Eigen::Transform<double, 3, Eigen::Affine> q2 = 
+//         AAToTransform(double(delta_2[0]), double(delta_2[1]), double(delta_2[2]));
     
     Eigen::Vector3d t1;
     Eigen::Vector3d t2;
@@ -246,20 +242,6 @@ struct PartialTranslationErrorNumeric {
     Eigen::Vector3d ur2_v;
     ur2_v << ur2[0], ur2[1], ur2[2];
     
-    // Vector projections for partials based on uncertainty
-    
-    Eigen::Vector3d l_ut1 = (q1 * T).dot(ut1_v) * ut1_v; // Portion of q1T which cannot be observed in sensor 1's frame of reference
-    Eigen::Vector3d l_ut2 = (q1 * T).dot(q * ut2_v) * ut2_v; // Portion of q1T which could not be observed in sensor 2's frame of reference
-    Eigen::Transform<double, 3, Eigen::Affine> v2 = TransformUncertainty(q.inverse(), q1, ur2); 
-    Eigen::Transform<double, 3, Eigen::Affine> v1 = TransformUncertainty(q, q2, ur1); 
-    Eigen::Vector3d l_ur2 = v1 * T; // Portion of T related to a portion of q1 that could not be observed
-    Eigen::Vector3d l_ur2_ut1 = (v2 * T).dot(ut1_v) * ut1_v; // Portion of T related to a portion of q1 that could not be observed, corresponding to u1
-    Eigen::Vector3d l_ur2_ut2 = (v2 * T).dot(ut2_v) * ut2_v; // Portion of T related to a portion of q1 that could not be observed, corresponding to u2
-    
-    Eigen::Vector3d r_ut1 = (q * t2).dot(ut1_v) * ut1_v;
-    Eigen::Vector3d r_ut2 = t1.dot(q * ut2_v) * ut2_v;
-    
-    
     Eigen::Vector3d left;
     left = (T - (q1 * T));
     Eigen::Vector3d right;
@@ -270,7 +252,7 @@ struct PartialTranslationErrorNumeric {
       error_vector = error_vector - (error_vector.dot(ut1_v) * ut1_v);
     }
     if(ut2_v.norm() != 0) {
-      error_vector = error_vector - (error_vector.dot(q * ut2_v) * ut2_v);
+      error_vector = error_vector - (error_vector.dot(q * ut2_v) * (q * ut2_v));
     }
     if(ur1_v.norm() != 0) {
       residuals[0] = error_vector.dot(ur1_v);
@@ -364,7 +346,83 @@ void PartialCalibrateR(
   fprintf(stdout, "RMSE: %f\n", rmse);
 }
 
-void PartialCalibratet(
+struct PartialRotWTransErrorNumeric {
+  PartialRotWTransErrorNumeric(const vector<double>& delta_1,
+                               const vector<double>& delta_2,
+                               const vector<double>& ur1,
+                               const vector<double>& ur2,
+                               const vector<double>& ut1,
+                               const vector<double>& ut2
+  ) :
+  delta_1(delta_1),
+  delta_2(delta_2),
+  ur1(ur1),
+  ur2(ur2),
+  ut1(ut1),
+  ut2(ut2){}
+  
+  bool operator()(const double* const transform,
+                  double* residuals) const {
+                    
+                    Eigen::Transform<double, 3, Eigen::Affine> q = 
+                    AAToTransform(transform[0], transform[1], transform[2]);
+                    
+                    Eigen::Vector3d t1;
+                    Eigen::Vector3d t2;
+                    Eigen::Vector3d T;
+                    t1 << delta_1[3], delta_1[4], delta_1[5];
+                    t2 << delta_2[3], delta_2[4], delta_2[5];
+                    T << transform[3], transform[4], transform[5];
+                    
+                    Eigen::Vector3d ut1_v;
+                    ut1_v << ut1[0], ut1[1], ut1[2];
+                    Eigen::Vector3d ut2_v;
+                    ut2_v << ut2[0], ut2[1], ut2[2];
+                    Eigen::Vector3d ur1_v;
+                    ur1_v << ur1[0], ur1[1], ur1[2];
+                    Eigen::Vector3d ur2_v;
+                    ur2_v << ur2[0], ur2[1], ur2[2];
+                    
+                    // Vector projections for partials based on uncertainty
+                    
+                    Eigen::Vector3d l_ut1 = q*(t2.dot( q.inverse() * ut1_v )*(q.inverse()*ut1_v));
+                    Eigen::Vector3d r_ut2 = (t1.dot(q*ut2_v)*(q*ut2_v));
+                    
+                    Eigen::Vector3d left;
+                    left = q * t2 - l_ut1;
+                    Eigen::Vector3d right;
+                    right = t1 - r_ut2;
+                    
+                    Eigen::Vector3d error_vector = left - right;
+                    
+                    residuals[0] = error_vector.norm();
+                    
+                    return true;
+                  }
+                  
+                  // Factory to hide the construction of the CostFunction object from
+                  // the client code.
+                  static ceres::CostFunction* Create(const vector<double>& delta_1,
+                                                     const vector<double>& delta_2,
+                                                     const vector<double>& ur1,
+                                                     const vector<double>& ur2,
+                                                     const vector<double>& ut1,
+                                                     const vector<double>& ut2
+                  ) {
+                    return (new ceres::NumericDiffCostFunction<PartialRotWTransErrorNumeric, 
+                            ceres::CENTRAL, 1, 6>(
+                              new PartialRotWTransErrorNumeric(delta_1, delta_2, ur1, ur2, ut1, ut2)));
+                  }
+                  
+                  const vector<double> delta_1;
+                  const vector<double> delta_2;
+                  const vector<double> ur1;
+                  const vector<double> ur2;
+                  const vector<double> ut1;
+                  const vector<double> ut2;
+};
+
+void PartialCalibrateT(
         const vector<vector<double> >& deltas_1,
         const vector<vector<double> >& uncertaintyR_1,
         const vector<vector<double> >& uncertaintyT_1,
@@ -434,66 +492,143 @@ void PartialCalibratet(
   fprintf(stdout, "RMSE: %f\n", rmse);
 }
 
-int main(int argc, char **argv) {
-  signal(SIGINT,HandleStop);
-  signal(SIGALRM,HandleStop);
+void PartialCalibrateRwT(
+  const vector<vector<double> >& deltas_1,
+  const vector<vector<double> >& uncertaintyR_1,
+  const vector<vector<double> >& uncertaintyT_1,
+  const vector<vector<double> >& deltas_2,
+  const vector<vector<double> >& uncertaintyR_2,
+  const vector<vector<double> >& uncertaintyT_2,
+  double* transform,
+  double* final_rmse) {
   
-  // Initialize Ros
-  ros::init(argc, argv, "partial_calibrate",
-  ros::init_options::NoSigintHandler);
-  ros::NodeHandle n;
+  //   bool kUseNumericOverAutoDiff = false;
+  CHECK_NOTNULL(transform);
+  // Tolerance for RMSE.
+  static const double kToleranceError = 0.00001;
+  // The maximum number of overall iterations.
+  static const int kMaxIterations = 80;
+  // The maximum number of repeat iterations while the RMSE is unchanged.
+  static const int kMaxRepeatIterations = 5;
+  double rmse = 1000000;
+  double last_rmse = 1000010;
+  vector<double> residuals;
+  double* trans = new double[3];
+  trans[0] = transform[3];
+  trans[1] = transform[4];
+  trans[2] = transform[5];
+  double* rot = new double[3];
+  rot[0] = transform[0];
+  rot[1] = transform[1];
+  rot[2] = transform[2];
+  for (int iteration = 0, repeat_iteration = 0;
+       iteration < kMaxIterations &&
+       repeat_iteration < kMaxRepeatIterations &&
+       rmse > kToleranceError;
+  ++iteration) {
+    if (DoubleEquals(rmse, last_rmse)) {
+      repeat_iteration++;
+    } else {
+      repeat_iteration = 0;
+    }
+    last_rmse = rmse;
+    // Construct ICP problem
+    ceres::Problem problem;
+    for(size_t i = 0; i < deltas_1.size(); i++) {
+      ceres::CostFunction* cost_function = NULL;
+      
+      cost_function = PartialRotWTransErrorNumeric::Create(
+        deltas_1[i], deltas_2[i], uncertaintyR_1[i], uncertaintyR_2[i], uncertaintyT_1[i], uncertaintyT_2[i]);
+      
+      problem.AddResidualBlock(cost_function,
+                               NULL, // squared loss
+                               transform);
+    }
+    
+    // Run Ceres problem
+    ceres::Solver::Options options;
+    options.linear_solver_type = ceres::DENSE_QR;
+    ceres::Solver::Summary summary;
+    ceres::Solve(options, &problem, &summary);
+    rmse =
+    sqrt(summary.final_cost / static_cast<double>(summary.num_residuals));
+    std::cout << summary.FullReport() << "\n";
+    ceres::Problem::EvaluateOptions evalOptions = ceres::Problem::EvaluateOptions();
+    residuals.clear();
+    problem.Evaluate(evalOptions, NULL, &residuals, NULL, NULL);
+  }
+  PrintPose(transform);
+  fprintf(stdout, "RMSE: %f\n", rmse);
+  }
   
-  //----------  Setup Publishers ----------
-//   cloud_pub_1 = n.advertise<sensor_msgs::PointCloud2> ("cloud_pub_1", 1);
-//   cloud_pub_2 = n.advertise<sensor_msgs::PointCloud2> ("cloud_pub_2", 1);
-//   cloud_pub_3 = n.advertise<sensor_msgs::PointCloud2> ("cloud_pub_3", 1);
-//   cloud_pub_4 = n.advertise<sensor_msgs::PointCloud2> ("cloud_pub_4", 1);
-//   vector<ros::Publisher> publishers;
-//   publishers.push_back(cloud_pub_1);
-//   publishers.push_back(cloud_pub_2);
-//   publishers.push_back(cloud_pub_3);
-//   publishers.push_back(cloud_pub_4);
-//   marker_pub =
-//   n.advertise<visualization_msgs::Marker>("visualization_marker", 10);
-//   markerArray_pub =
-//   n.advertise<visualization_msgs::MarkerArray>(
-//       "visualization_marker_array", 10);
-  cout << "reading deltas" << endl;
-  string file = "generated_deltas.txt";
-  vector<vector<double> > deltas_1;
-  vector<vector<double> > deltas_2;
-  vector<vector<double> > uncertaintyR_1;
-  vector<vector<double> > uncertaintyE_1;
-  vector<vector<double> > uncertaintyE_2;
-  vector<vector<double> > uncertaintyR_2;
-  vector<vector<double> > uncertaintyT_1;
-  vector<vector<double> > uncertaintyT_2;
-  ReadDeltasFromFile(file,
-                     &deltas_1,
-                     &deltas_2,
-                     &uncertaintyE_1,
-                     &uncertaintyE_2);
-  
-  ReadUncertaintiesFromFile("generated_uncertaintiest.txt",
-                     &uncertaintyT_1,
-                     &uncertaintyT_2);
-  
-  ReadUncertaintiesFromFile("generated_uncertaintiesr.txt",
-                            &uncertaintyR_1,
-                            &uncertaintyR_2);
+  double* turtlebot_calibrate(string filename) {
+    
+    cout << "reading deltas" << endl;
+    string file_rot = filename + "_rot_brass.pose";
+    string file_trans = filename + "_trans_brass.pose";
+    vector<vector<double> > deltas_1;
+    vector<vector<double> > deltas_2;
+    vector<vector<double> > t_deltas_1;
+    vector<vector<double> > t_deltas_2;
+    vector<vector<double> > uncertaintyR_1;
+    vector<vector<double> > uncertaintyE_1;
+    vector<vector<double> > t_uncertaintyR_1;
+    vector<vector<double> > uncertaintyE_2;
+    vector<vector<double> > uncertaintyR_2;
+    vector<vector<double> > t_uncertaintyR_2;
+    vector<vector<double> > uncertaintyT_1;
+    vector<vector<double> > uncertaintyT_2;
+    vector<vector<double> > t_uncertaintyT_1;
+    vector<vector<double> > t_uncertaintyT_2;
+    
+    ReadDeltasFromFile(file_rot,
+                       &deltas_1,
+                       &deltas_2,
+                       &uncertaintyE_1,
+                       &uncertaintyE_2);
+    ReadDeltasFromFile(file_trans,
+                       &t_deltas_1,
+                       &t_deltas_2,
+                       &uncertaintyE_1,
+                       &uncertaintyE_2);
+    
+    string uncertainty_t_file = filename + "_rot_uncertainty_t.txt";
+    string uncertainty_r_file = filename + "_rot_uncertainty_r.txt";
+    string t_uncertainty_t_file = filename + "_trans_uncertainty_t.txt";
+    string t_uncertainty_r_file = filename + "_trans_uncertainty_r.txt";
+    ReadUncertaintiesFromFile(uncertainty_t_file,
+                              &uncertaintyT_1,
+                              &uncertaintyT_2);
+    
+    ReadUncertaintiesFromFile(uncertainty_r_file,
+                              &uncertaintyR_1,
+                              &uncertaintyR_2);
+    
+    ReadUncertaintiesFromFile(t_uncertainty_t_file,
+                              &t_uncertaintyT_1,
+                              &t_uncertaintyT_2);
+    
+    ReadUncertaintiesFromFile(t_uncertainty_r_file,
+                              &t_uncertaintyR_1,
+                              &t_uncertaintyR_2);
+    
+    cout << deltas_1.size() << endl;
+    cout << deltas_2.size() << endl;
+    double* transform = new double[6];
+    transform[0] = 0;
+    transform[1] = 0;
+    transform[2] = 0;
+    transform[3] = 0;
+    transform[4] = 0;
+    transform[5] = 0;
+    
+    double* RMSE = 0;
+    PartialCalibrateR(deltas_1, uncertaintyR_1, uncertaintyT_1, deltas_2, uncertaintyR_2, uncertaintyT_2,transform, RMSE);
+    PartialCalibrateRwT(t_deltas_1, t_uncertaintyR_1, t_uncertaintyT_1, t_deltas_2, t_uncertaintyR_2, t_uncertaintyT_2, transform, RMSE);
+    PartialCalibrateT(deltas_1, uncertaintyR_1, uncertaintyT_1, deltas_2, uncertaintyR_2, uncertaintyT_2,transform, RMSE);
+    return transform;
+    return 0;
+  }
 
-  cout << deltas_1.size() << endl;
-  cout << deltas_2.size() << endl;
-  double* transform = new double[6];
-  transform[0] = 0;
-  transform[1] = 0;
-  transform[2] = 0;
-  transform[3] = 0;
-  transform[4] = 0;
-  transform[5] = 0;
-  
-  double* RMSE = 0;
-  PartialCalibrateR(deltas_1, uncertaintyR_1, uncertaintyT_1, deltas_2, uncertaintyR_2, uncertaintyT_2,transform, RMSE);
-  PartialCalibratet(deltas_1, uncertaintyR_1, uncertaintyT_1, deltas_2, uncertaintyR_2, uncertaintyT_2,transform, RMSE);
-  return 0;
+
 }
