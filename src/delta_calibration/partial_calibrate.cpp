@@ -499,6 +499,12 @@ void PartialCalibrateRwT(
   const vector<vector<double> >& deltas_2,
   const vector<vector<double> >& uncertaintyR_2,
   const vector<vector<double> >& uncertaintyT_2,
+  const vector<vector<double> >& deltasT_1,
+  const vector<vector<double> >& TuncertaintyR_1,
+  const vector<vector<double> >& TuncertaintyT_1,
+  const vector<vector<double> >& deltasT_2,
+  const vector<vector<double> >& TuncertaintyR_2,
+  const vector<vector<double> >& TuncertaintyT_2,
   double* transform,
   double* final_rmse) {
   
@@ -537,7 +543,19 @@ void PartialCalibrateRwT(
     for(size_t i = 0; i < deltas_1.size(); i++) {
       ceres::CostFunction* cost_function = NULL;
       
+      cost_function = PartialRotationErrorNumeric::Create(
+        deltas_1[i], deltas_2[i], uncertaintyR_1[i], uncertaintyR_2[i]);
+        
+      problem.AddResidualBlock(cost_function,
+                               NULL, // squared loss
+                               transform);
       cost_function = PartialRotWTransErrorNumeric::Create(
+        deltasT_1[i], deltasT_2[i], TuncertaintyR_1[i], TuncertaintyR_2[i], TuncertaintyT_1[i], TuncertaintyT_2[i]);
+      problem.AddResidualBlock(cost_function,
+                               NULL, // squared loss
+                               transform);
+      
+      cost_function = PartialTranslationErrorNumeric::Create(
         deltas_1[i], deltas_2[i], uncertaintyR_1[i], uncertaintyR_2[i], uncertaintyT_1[i], uncertaintyT_2[i]);
       
       problem.AddResidualBlock(cost_function,
@@ -564,56 +582,58 @@ void PartialCalibrateRwT(
   double* turtlebot_calibrate(string filename) {
     
     cout << "reading deltas" << endl;
-    string file_rot = filename + "_rot_brass.pose";
-    string file_trans = filename + "_trans_brass.pose";
+    string file1 = filename + "rot.txt";
+    string file2 = filename + "trans.txt";
+    string file3 = filename + "uncR.txt";
+    string file4 = filename + "uncT.txt";
     vector<vector<double> > deltas_1;
     vector<vector<double> > deltas_2;
-    vector<vector<double> > t_deltas_1;
-    vector<vector<double> > t_deltas_2;
+    vector<vector<double> > deltasT_1;
+    vector<vector<double> > deltasT_2;
     vector<vector<double> > uncertaintyR_1;
     vector<vector<double> > uncertaintyE_1;
-    vector<vector<double> > t_uncertaintyR_1;
     vector<vector<double> > uncertaintyE_2;
     vector<vector<double> > uncertaintyR_2;
-    vector<vector<double> > t_uncertaintyR_2;
     vector<vector<double> > uncertaintyT_1;
     vector<vector<double> > uncertaintyT_2;
-    vector<vector<double> > t_uncertaintyT_1;
-    vector<vector<double> > t_uncertaintyT_2;
-    
-    ReadDeltasFromFile(file_rot,
+    vector<vector<double> > TuncertaintyR_1;
+    vector<vector<double> > TuncertaintyR_2;
+    vector<vector<double> > TuncertaintyT_1;
+    vector<vector<double> > TuncertaintyT_2;
+    ReadDeltasFromFile(file1,
                        &deltas_1,
                        &deltas_2,
                        &uncertaintyE_1,
                        &uncertaintyE_2);
-    ReadDeltasFromFile(file_trans,
-                       &t_deltas_1,
-                       &t_deltas_2,
+    
+    ReadDeltasFromFile(file2,
+                       &deltasT_1,
+                       &deltasT_2,
                        &uncertaintyE_1,
                        &uncertaintyE_2);
     
-    string uncertainty_t_file = filename + "_rot_uncertainty_t.txt";
-    string uncertainty_r_file = filename + "_rot_uncertainty_r.txt";
-    string t_uncertainty_t_file = filename + "_trans_uncertainty_t.txt";
-    string t_uncertainty_r_file = filename + "_trans_uncertainty_r.txt";
-    ReadUncertaintiesFromFile(uncertainty_t_file,
+    ReadUncertaintiesFromFile(file3,
                               &uncertaintyT_1,
                               &uncertaintyT_2);
     
-    ReadUncertaintiesFromFile(uncertainty_r_file,
+    ReadUncertaintiesFromFile(file3,
                               &uncertaintyR_1,
                               &uncertaintyR_2);
     
-    ReadUncertaintiesFromFile(t_uncertainty_t_file,
-                              &t_uncertaintyT_1,
-                              &t_uncertaintyT_2);
+    ReadUncertaintiesFromFile(file4,
+                              &TuncertaintyT_1,
+                              &TuncertaintyT_2);
     
-    ReadUncertaintiesFromFile(t_uncertainty_r_file,
-                              &t_uncertaintyR_1,
-                              &t_uncertaintyR_2);
+    ReadUncertaintiesFromFile(file4,
+                              &TuncertaintyR_1,
+                              &TuncertaintyR_2);
     
     cout << deltas_1.size() << endl;
     cout << deltas_2.size() << endl;
+    cout << uncertaintyR_1.size() << endl;
+    cout << uncertaintyR_2.size() << endl;
+    cout << uncertaintyT_1.size() << endl;
+    cout << uncertaintyT_2.size() << endl;
     double* transform = new double[6];
     transform[0] = 0;
     transform[1] = 0;
@@ -623,11 +643,10 @@ void PartialCalibrateRwT(
     transform[5] = 0;
     
     double* RMSE = 0;
-    PartialCalibrateR(deltas_1, uncertaintyR_1, uncertaintyT_1, deltas_2, uncertaintyR_2, uncertaintyT_2,transform, RMSE);
-    PartialCalibrateRwT(t_deltas_1, t_uncertaintyR_1, t_uncertaintyT_1, t_deltas_2, t_uncertaintyR_2, t_uncertaintyT_2, transform, RMSE);
-    PartialCalibrateT(deltas_1, uncertaintyR_1, uncertaintyT_1, deltas_2, uncertaintyR_2, uncertaintyT_2,transform, RMSE);
+    //   PartialCalibrateR(deltas_1, uncertaintyR_1, uncertaintyT_1, deltas_2, uncertaintyR_2, uncertaintyT_2,transform, RMSE);
+    //   cout << "calibrated" << endl;
+    PartialCalibrateRwT(deltas_1, uncertaintyR_1, uncertaintyT_1, deltas_2, uncertaintyR_2, uncertaintyT_2,deltasT_1, TuncertaintyR_1, TuncertaintyT_1, deltasT_2, TuncertaintyR_2, TuncertaintyT_2,transform, RMSE);
     return transform;
-    return 0;
   }
 
 

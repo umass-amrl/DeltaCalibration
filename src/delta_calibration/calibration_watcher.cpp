@@ -19,6 +19,7 @@
 
 ros::Publisher ground_error_pub;
 ros::Publisher calibration_error_pub;
+ros::Publisher recalibrate_pub;
 ros::Publisher cloudx_pub_1;
 ros::Publisher cloudx_pub_2;
 ros::Publisher cloudx_pub_3;
@@ -42,6 +43,7 @@ double odom_time_last;
 double cloud_time_last;
 pcl::PointCloud<pcl::PointXYZ> global_cloud;
 pcl::PointCloud<pcl::PointXYZ> last_cloud;
+pcl::PointCloud<pcl::PointXYZ> ground_cloud;
 double global_min;
 typedef actionlib::SimpleActionClient<frontier_exploration::ExploreTaskAction> Client;
 enum Mode{monitor, record, record_rot, record_trans, find_scene, calibrate};
@@ -117,6 +119,28 @@ double* Quat2AA(double* quat) {
   aa[4] = quat[5];
   aa[5] = quat[6];
   return aa;
+}
+
+double* AA2Quat(double* AA) {
+  Eigen::Vector3d aa= {AA[0], AA[1], AA[2]};
+  double* q = new double[6];
+  double angle = aa.norm();
+  if( angle) {
+    q[0] = 0;
+    q[1] = 0;
+    q[2] = 0;
+    q[3] = 1;
+  } else {
+    Eigen::Vector3d  axis = aa / angle;
+    q[0] = sin(angle/2) * axis[0];
+    q[1] = sin(angle/2) * axis[0];
+    q[2] = sin(angle/2) * axis[0];
+    q[3] = cos(angle/2);
+  }
+  q[4] = AA[3];
+  q[5] = AA[4];
+  q[6] = AA[5];
+  return q;
 }
 
 void PrintPose(double* pose){
@@ -410,7 +434,59 @@ void CheckGroundPlane(const pcl::PointCloud<pcl::PointXYZ>& pcl_cloud) {
   m.data.resize(data_sz);
   m.data[0] = angle;
   m.data[1] = offset;
+  ground_cloud = pcl_cloud;
   ground_error_pub.publish(m);
+}
+
+
+void GroundRecalibrate() {
+  // Extract Planes
+  vector<Eigen::Vector4d> plane_normals;
+  vector<Eigen::Vector3d> plane_centroids;
+  delta_calc::ExtractPlanes(ground_cloud, &plane_normals, &plane_centroids);
+  
+  // Get Lowest Plane
+  double lowest_value = 500;
+  Eigen::Vector4d ground_normal;
+  for(size_t i = 0; i < plane_centroids.size(); ++i) {
+    if(plane_centroids[i][2] < lowest_value) {
+      lowest_value = plane_centroids[i][2];
+      ground_normal = plane_normals[i];
+    }
+  }
+  
+  // Compare that normal to the z normal
+  Eigen::Vector3d z_axis = {0, 0, 1};
+  Eigen::Vector3d normal_axis = {ground_normal[0], ground_normal[1], ground_normal[2]};
+  Vector3d rotation_axis = normal_axis.cross(z_axis);
+  double angle = VectorAngle(normal_axis, z_axis);
+  Vector3d aa = angle * rotation_axis;
+  
+  double offset = 0 - lowest_value;
+  double new_transf[6] = {aa[0], aa[1], aa[2], 0, 0, offset};
+  double* aa_extr = Quat2AA(extrinsics);
+  double* new_cal = CombineTransform(aa_extr, new_transf);
+  
+  // Save new extrinsics
+  double* new_quat = AA2Quat(new_cal);
+  extrinsics[0] = new_quat[0];
+  extrinsics[1] = new_quat[1];
+  extrinsics[2] = new_quat[2];
+  extrinsics[3] = new_quat[3];
+  extrinsics[4] = new_quat[4];
+  extrinsics[5] = new_quat[5];
+  extrinsics[6] = new_quat[6];
+  geometry_msgs::PoseStamped message;
+  message.pose.position.x = extrinsics[4];
+  message.pose.position.y = extrinsics[5];
+  message.pose.position.z = current_pose[6];
+  message.pose.orientation.x = extrinsics[0];
+  message.pose.orientation.y = extrinsics[1];
+  message.pose.orientation.z = extrinsics[2];
+  message.pose.orientation.w = extrinsics[3];
+  message.header.stamp = ros::Time::now();
+  message.header.frame_id = "map";
+  recalibrate_pub.publish(message);
 }
 
 void MakeMove(vector<double> move) {
@@ -660,6 +736,30 @@ pcl::PointCloud<pcl::PointXYZ> CutCloud(pcl::PointCloud<pcl::PointXYZ> cloud) {
   return return_cloud;
 }
 
+void Recalibrate() {
+  string file;
+  double* new_cal = partial_calibrate::turtlebot_calibrate(file);
+  double* new_quat = AA2Quat(new_cal);
+  extrinsics[0] = new_quat[0];
+  extrinsics[1] = new_quat[1];
+  extrinsics[2] = new_quat[2];
+  extrinsics[3] = new_quat[3];
+  extrinsics[4] = new_quat[4];
+  extrinsics[5] = new_quat[5];
+  extrinsics[6] = new_quat[6];
+  geometry_msgs::PoseStamped message;
+  message.pose.position.x = extrinsics[4];
+  message.pose.position.y = extrinsics[5];
+  message.pose.position.z = current_pose[6];
+  message.pose.orientation.x = extrinsics[0];
+  message.pose.orientation.y = extrinsics[1];
+  message.pose.orientation.z = extrinsics[2];
+  message.pose.orientation.w = extrinsics[3];
+  message.header.stamp = ros::Time::now();
+  message.header.frame_id = "map";
+  recalibrate_pub.publish(message);
+}
+
 void DepthCb(sensor_msgs::PointCloud2 msg) {
   cloud_time_last = cloud_time;
   cloud_time = msg.header.stamp.toSec();
@@ -754,10 +854,15 @@ void OdomCb(const nav_msgs::Odometry& msg) {
 void CommandCb(const std_msgs::String::ConstPtr& msg)
 {
   ROS_INFO("I heard: [%s]", msg->data.c_str());
-  string scene_find = "recalibrate";
-  if(scene_find.compare(msg->data.c_str()) == 0) {
-    mode = find_scene;
+  string recalibrate = "recalibrate";
+  string ground_recalibrate = "ground_recalibrate";
+  if(recalibrate.compare(msg->data.c_str()) == 0) {
+    Recalibrate();
   }
+  if(ground_recalibrate.compare(msg->data.c_str()) == 0) {
+    GroundRecalibrate();
+  }
+  
 }
 
 void StatusCb(const actionlib_msgs::GoalStatusArray::ConstPtr& msg) {
@@ -801,6 +906,7 @@ int main(int argc, char **argv) {
   image_pub = n.advertise<sensor_msgs::Image> ("image_pub", 1);
   cancel_pub = n.advertise<actionlib_msgs::GoalID> ("/explore_server/cancel", 1);
   move_pub = n.advertise<geometry_msgs::PoseStamped> ("/move_base_simple/goal", 1);
+  recalibrate_pub = n.advertise<geometry_msgs::PoseStamped> ("/calibration/extrinsic_update", 1);
   velocity_pub = n.advertise<geometry_msgs::Twist> ("/mobile_base/commands/velocity", 1);
   ros::Subscriber depth_sub = n.subscribe("/camera/depth/points", 1, DepthCb);
   ros::Subscriber odom_sub = n.subscribe("/odom", 1, OdomCb);

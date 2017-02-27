@@ -1,5 +1,5 @@
 
-function [t_err, r_err,deltas1,deltas2] = genTestPartialCal(N,angle,noise)
+function [t_err, r_err, t_m_err, r_m_err] = genTestPartialCal(N,angle,noise)
 clc;
 A = RandomTransform6D(3.14159, .5)';
 % A = [0 0 1.5 0 0 0 0 0];
@@ -15,10 +15,10 @@ A2 = [0 0 0 0 0 0 0 0];
 A2I = [];
 A1T = [];
 A2T = [];
-U1t = [];
-U2t = [];
-U1r = [];
-U2r = [];
+U1t = [0 0 0];
+U2t = [0 0 0];
+U1r = [0 0 0];
+U2r = [0 0 0];
 uz = [0 0 1];
 ux = [1 0 0];
 uy = [0 1 0];
@@ -32,6 +32,7 @@ last_t1 = [0 0 0 0 0 0];
 last_t2 = [0 0 0 0 0 0];
 time = [0];
 count = 0;
+var = [noise_angular noise_angular noise_angular noise_translation noise_translation noise_translation];
 for i=1:N
   % Canned test. O)ne sensor uncertainty
   % Set 1: x-axis rotation (uncertain x), x-axis rotation (uncertain y),
@@ -49,7 +50,10 @@ for i=1:N
   a2x = A1toA2(A', a1x');
   a2y = A1toA2(A', a1y');
   a2z = A1toA2(A', a1z');
-  
+  a1x = AddNoiseToTransform6D(a1x', noise_angular, noise_translation)'
+  a1y = AddNoiseToTransform6D(a1y', noise_angular, noise_translation)'
+  a2x = AddNoiseToTransform6D(a2x', noise_angular, noise_translation)'
+  a2y = AddNoiseToTransform6D(a2y', noise_angular, noise_translation)'
   a1x_ux = StripRotation(a1x,uy);  
   a1x_uy = StripRotation(a1x,ux);
   a1y_ux = StripRotation(a1y, uy);
@@ -70,10 +74,10 @@ for i=1:N
   A1 = [A1; a1x_uy];
   A1 = [A1; a1y_uy];
   
-  A2 = [A2; a2x];
-  A2 = [A2; a2y];
-  A2 = [A2; a2x];
-  A2 = [A2; a2y];
+  A2 = [A2; a2x 0 0];
+  A2 = [A2; a2y 0 0];
+  A2 = [A2; a2x 0 0];
+  A2 = [A2; a2y 0 0];
   tr1 = rotm2aa(aa2rotm(a2x(1:3)') * aa2rotm(last_t1(1:3)'));
   tt1 = a2x(4:6) + last_t1(4:6)
   t1 = [tr1 tt1]
@@ -116,14 +120,14 @@ for i=1:N
   T2 = [T2; t2];
   T1 = [T1; t1];
   T2 = [T2; t2];
-  V1 = [V1; empty];
-  V2 = [V2; empty];
-  V1 = [V1; empty];
-  V2 = [V2; empty];
-  V1 = [V1; empty];
-  V2 = [V2; empty];
-  V1 = [V1; empty];
-  V2 = [V2; empty];
+  V1 = [V1; var];
+  V2 = [V2; var];
+  V1 = [V1; var];
+  V2 = [V2; var];
+  V1 = [V1; var];
+  V2 = [V2; var];
+  V1 = [V1; var];
+  V2 = [V2; var];
   time = [time; count + 1];
   time = [time; count + 1];
   time = [time; count + 1];
@@ -147,17 +151,23 @@ dlmwrite('generated_deltas.txt', C0, ' ');
 dlmwrite('generated_uncertaintiest.txt', Ut, ' ');
 dlmwrite('generated_uncertaintiesr.txt', Ur, ' ');
 size(C0);
-A_cal = calibrate_data(C0)
+!../../../bin/partial_calibrate
+B_cal = Test3KinectNav();
+A_cal = dlmread(strcat('calibration', '.pose'), '\t');
 A
+A_multiCal = [B_cal.rot B_cal.tran];
+A_multiCal = A_multiCal(2,:)
 q = aa2quat(A');
 fprintf('\n %f degrees about [%f %f %f]\n\n',...
         180 / pi * 2.0 * acos(q(1)),... 
         q(2:4) / norm(q(2:4)));
-% Compute angular error
-error_aa = rotm2aa(inv(aa2rotm(vpa(A(1:3)'))) * aa2rotm(vpa(A_cal(1:3)')))
-% [thetax, thetay, thetaz] = rotm2eulerangles(inv(aa2rotm(A(1:3)')))
-% [thetaxt, thetayt, thetazt] = rotm2eulerangles(aa2rotm(A_cal(1:3)'))
+error_aa = rotm2aa(inv(aa2rotm(A(1:3)')) * aa2rotm(A_cal(1:3)'));
 r_err = norm(error_aa) / pi * 180
-
+error_aa_multical = rotm2aa(inv(aa2rotm(A(1:3)')) * aa2rotm(A_multiCal(1:3)'));
+r_m_err = norm(error_aa_multical) / pi * 180
 % Compute translation error
 t_err = norm(A(4:6) - A_cal(4:6))
+t_m_err = norm(A(4:6) - A_multiCal(4:6))
+A
+A_cal
+A_multiCal
