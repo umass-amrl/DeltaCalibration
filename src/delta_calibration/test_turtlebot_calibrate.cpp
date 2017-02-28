@@ -26,8 +26,8 @@ int main(int argc, char **argv) {
   ros::NodeHandle n;
   
   cout << "reading deltas" << endl;
-  string file1 = "generated_deltas_rot.txt";
-  string file2 = "generated_deltas_trans.txt";
+  string file1 = "turtlebot_corner_rot_brass.pose";
+  string file2 = "turtlebot_corner_trans_brass.pose";
   vector<vector<double> > deltas_1;
   vector<vector<double> > deltas_2;
   vector<vector<double> > deltasT_1;
@@ -54,19 +54,19 @@ int main(int argc, char **argv) {
                      &uncertaintyE_1,
                      &uncertaintyE_2);
   
-  ReadUncertaintiesFromFile("generated_uncertaintiest.txt",
+  ReadUncertaintiesFromFile("turtlebot_corner_rot_uncertainty_t.txt",
                      &uncertaintyT_1,
                      &uncertaintyT_2);
   
-  ReadUncertaintiesFromFile("generated_uncertaintiesr.txt",
+  ReadUncertaintiesFromFile("turtlebot_corner_rot_uncertainty_r.txt",
                             &uncertaintyR_1,
                             &uncertaintyR_2);
   
-  ReadUncertaintiesFromFile("generated_uncertaintiest.txt",
+  ReadUncertaintiesFromFile("turtlebot_corner_trans_uncertainty_t.txt",
                             &TuncertaintyT_1,
                             &TuncertaintyT_2);
   
-  ReadUncertaintiesFromFile("generated_uncertaintiesr.txt",
+  ReadUncertaintiesFromFile("turtlebot_corner_trans_uncertainty_r.txt",
                             &TuncertaintyR_1,
                             &TuncertaintyR_2);
 

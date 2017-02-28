@@ -1307,13 +1307,14 @@ rosbag::View::iterator ClosestOdom(rosbag::View::iterator it,
     }
     keyframe_odom->clear();
     keyframe_odom->push_back(best_time);
-    keyframe_odom->push_back(best_odom->pose.pose.position.x);
-    keyframe_odom->push_back(best_odom->pose.pose.position.y);
-    keyframe_odom->push_back(best_odom->pose.pose.position.z);
     keyframe_odom->push_back(best_odom->pose.pose.orientation.x);
     keyframe_odom->push_back(best_odom->pose.pose.orientation.y);
     keyframe_odom->push_back(best_odom->pose.pose.orientation.z);
     keyframe_odom->push_back(best_odom->pose.pose.orientation.w);
+    keyframe_odom->push_back(best_odom->pose.pose.position.x);
+    keyframe_odom->push_back(best_odom->pose.pose.position.y);
+    keyframe_odom->push_back(best_odom->pose.pose.position.z);
+    
     return it;
 }
 
@@ -1327,17 +1328,17 @@ double* DeltaFromOdom(const vector<double>& current,
   double* posek = new double[6];
   
   Eigen::Vector3d cur_translation;
-  cur_translation[0] = current[4];
-  cur_translation[1] = current[5];
-  cur_translation[2] = current[6];
+  cur_translation[0] = current[5];
+  cur_translation[1] = current[6];
+  cur_translation[2] = current[7];
   
   // Build the affine transforms for the previous pose
-  Eigen::Quaternion<double> previous_quat(previous[3], previous[0], previous[1], previous[2]);
+  Eigen::Quaternion<double> previous_quat(previous[4], previous[1], previous[2], previous[3]);
   Eigen::Translation<double, 3> previous_translation =
-  Eigen::Translation<double, 3>(previous[4], previous[5], previous[6]);
+  Eigen::Translation<double, 3>(previous[5], previous[6], previous[7]);
   
   // Build the affine transforms based on the current pose
-  Eigen::Quaternion<double> current_quat(current[3], current[0], current[1], current[2]);
+  Eigen::Quaternion<double> current_quat(current[4], current[1], current[2], current[3]);
   
   // Calculate delta rotation
   Eigen::Quaternion<double> rotation = previous_quat.inverse() * current_quat;
@@ -1354,7 +1355,6 @@ double* DeltaFromOdom(const vector<double>& current,
   // Recompute the rotation angle
   double test_angle = test.angle();
   Eigen::Vector3d test_trans = test_axis * test_angle;
-  cout << test_trans[0] << " " << test_trans[1] << " " << test_trans[2] << endl;
   transform = transform;
   
   // Find the rotation component
@@ -1381,7 +1381,6 @@ double* DeltaFromOdom(const vector<double>& current,
   posek[0] = combined_axis[0];
   posek[1] = combined_axis[1];
   posek[2] = combined_axis[2];
-
   return posek;
 }
                       
@@ -1496,8 +1495,11 @@ void DeltaCalculationOdometry(string bag_name,
   // than some threshold, this is our next keyframe
   // If there has been sufficient change update keyframe and save deltas
   double* previous_odom_delta = DeltaFromOdom(current_odom, previous_odom);
-  
   double* odom_delta = DeltaFromOdom(current_odom, keyframe_odom);
+//   PrintPose(current_odom);
+//   PrintPose(previous_odom);
+  PrintPose(previous_odom_delta);
+  PrintPose(odom_delta);
   cout << endl;
   cout << "check delta odom" << endl;
   bool k1_change = CheckChangeVel(variables->k1_combined_transform, degree, variables->k1_velocity_list);
@@ -1585,7 +1587,7 @@ void DeltaCalculationBrass(string bag_name,
   ofstream uncertaintyT_file (uncertainty_t_string.c_str());
   ofstream uncertaintyR_file (uncertainty_r_string.c_str());
   
-  int avg_len = 5;
+  int avg_len = 1;
   bool dist_okay = false;
   int count = 0;
   // Save normals and get size of normals
@@ -1662,6 +1664,8 @@ void DeltaCalculationBrass(string bag_name,
   double* previous_odom_delta = DeltaFromOdom(current_odom, previous_odom);
   // Calculate the keyframe odometry delta
   double* odom_delta = DeltaFromOdom(current_odom, keyframe_odom);
+  PrintPose(previous_odom_delta);
+  PrintPose(odom_delta);
   // Have to watch the check changes when I test this
   cout << endl;
   cout << "check delta odom" << endl;
@@ -1673,7 +1677,7 @@ void DeltaCalculationBrass(string bag_name,
   if(k1_change && k2_change) {
     dist_okay = false;
     // This is getting calculated twice but I don't know why.
-    double* odom_delta = DeltaFromOdom(current_odom, keyframe_odom);
+    double* odom_delta = DeltaFromOdom(keyframe_odom, current_odom);
     cout << endl;
     keyframe_odom = current_odom;
     vector<double> pose0(6, 0.0);
@@ -1695,7 +1699,7 @@ void DeltaCalculationBrass(string bag_name,
     WriteUncertaintyFile(uncertainty_t, uncertaintyT_file);
     WriteUncertaintyFile(uncertainty_r, uncertaintyR_file);
     
-    StripUncertainty(uncertainty_t, uncertainty_r, variables->k1_combined_transform);
+//     StripUncertainty(uncertainty_t, uncertainty_r, variables->k1_combined_transform);
     // Writes both deltas to the same file
     WritePoseFile(variables->k1_combined_transform, variables->k1_timestamp, 
         count, pose_file);
