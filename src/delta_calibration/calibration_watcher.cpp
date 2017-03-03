@@ -291,66 +291,83 @@ double* TransformTransform(double* base_transform, double* transform) {
 }
 
 void DeltaErr() {
-  
-  if(DoubleEquals2(cloud_time, odom_time) && DoubleEquals2(cloud_time_last, odom_time_last)) {  
+//   cout << "cloud time: " << cloud_time << " odom_time: " << odom_time << endl;
+//   cout << "cloud time: " << cloud_time_last << " odom_time: " << odom_time_last << endl;
+//   cout << fabs(cloud_time-odom_time) << endl;
+//   cout << fabs(cloud_time_last-odom_time_last) << endl;
+  if(DoubleEquals2(cloud_time, odom_time)) { 
     
-    double* transform = DeltaFromOdom(last_pose, current_pose);
-    pcl::PointCloud<pcl::PointXYZ> cloud = last_cloud;
-    pcl::PointCloud<pcl::Normal> normals_1 = GetNormals(cloud);
-    pcl::PointCloud<pcl::Normal> normals_2 = GetNormals(global_cloud);
-    double* ext = Quat2AA(extrinsics);
-    double* combined = TransformTransform(transform, ext);
-    TransformPointCloud(&cloud, combined);
-    vector<int > nearest_neigbors;
-    vector<int > start_points;
-    vector<Eigen::Vector2d> image_coords_1;
-    vector<Eigen::Vector2d> image_coords_2;
-    double* calculated_delta = new double[6];
-    // Initialize transform ARRAYS
-    vector<double> pose0(6, 0.0);
-    std::copy(pose0.begin(), pose0.end(), calculated_delta);
-    vector<Eigen::Vector2d> empty_coords;
-    vector<ros::Publisher> publishers;
-    publishers.push_back(cloudx_pub_1);
-    publishers.push_back(cloudx_pub_2);
-    publishers.push_back(cloudx_pub_3);
-    ICP (10,
-       .05,
-       publishers,
-       "",
-       "",
-       last_cloud,
-       global_cloud,
-       normals_1,
-       normals_2,
-       empty_coords,
-       empty_coords,
-       calculated_delta,
-       NULL);
-    vector<Eigen::Vector4d> plane_normals;
-    vector<Eigen::Vector3d> plane_centroids;
-    delta_calc::ExtractPlanes(cloud, &plane_normals, &plane_centroids);
+    if (DoubleEquals2(cloud_time_last, odom_time_last) && (!DoubleEquals2(cloud_time_last, 0))
+      && fabs(cloud_time - cloud_time_last) < .5) {  
     
-    Eigen::Vector3d uncertainty_t;
-    Eigen::Vector3d uncertainty_r;
-    delta_calc::ExtractUncertainty(plane_normals, &uncertainty_t, &uncertainty_r);
-    delta_calc::StripUncertainty(uncertainty_t, uncertainty_r, calculated_delta);
-    delta_calc::StripUncertainty(uncertainty_t, uncertainty_r, combined);
+      double* transform = DeltaFromOdom(last_pose, current_pose);
+      pcl::PointCloud<pcl::PointXYZ> cloud = last_cloud;
+      pcl::PointCloud<pcl::Normal> normals_1 = GetNormals(cloud);
+      pcl::PointCloud<pcl::Normal> normals_2 = GetNormals(global_cloud);
+      double* ext = Quat2AA(extrinsics);
+      double* combined = TransformTransform(transform, ext);
+      TransformPointCloud(&cloud, combined);
+      vector<int > nearest_neigbors;
+      vector<int > start_points;
+      vector<Eigen::Vector2d> image_coords_1;
+      vector<Eigen::Vector2d> image_coords_2;
+      double* calculated_delta = new double[6];
+      // Initialize transform ARRAYS
+      vector<double> pose0(6, 0.0);
+      std::copy(pose0.begin(), pose0.end(), calculated_delta);
+      vector<Eigen::Vector2d> empty_coords;
+      vector<ros::Publisher> publishers;
+      publishers.push_back(cloudx_pub_1);
+      publishers.push_back(cloudx_pub_2);
+      publishers.push_back(cloudx_pub_3);
+      ICP (10,
+	  .1,
+	  publishers,
+	  "",
+	  "",
+	  last_cloud,
+	  global_cloud,
+	  normals_1,
+	  normals_2,
+	  empty_coords,
+	  empty_coords,
+	  calculated_delta,
+	  NULL);
+      vector<Eigen::Vector4d> plane_normals;
+      vector<Eigen::Vector3d> plane_centroids;
+      delta_calc::ExtractPlanes(cloud, &plane_normals, &plane_centroids);
+      
+      Eigen::Vector3d uncertainty_t;
+      Eigen::Vector3d uncertainty_r;
+      delta_calc::ExtractUncertainty(plane_normals, &uncertainty_t, &uncertainty_r);
+      cout << uncertainty_t << endl;
+      Eigen::Vector3d uncertainty_ry = {0,1,0};
+      Eigen::Vector3d uncertainty_rx = {1,0,0};
+      Eigen::Vector3d uncertainty_tz = {0,0,1};
+      delta_calc::StripUncertainty(uncertainty_t, uncertainty_r, calculated_delta);
+      delta_calc::StripUncertainty(uncertainty_t, uncertainty_r, combined);
+//       delta_calc::StripUncertainty(uncertainty_tz, uncertainty_ry, calculated_delta);
+// //       delta_calc::StripUncertainty(uncertainty_tz, uncertainty_rx, calculated_delta);
 
-    Eigen::Matrix<double, 4, 1> error = TransformDifference(combined, calculated_delta);
-    const unsigned int data_sz = 4;
-    std_msgs::Float32MultiArray m;
-    
-    m.layout.dim.push_back(std_msgs::MultiArrayDimension());
-    m.layout.dim[0].size = data_sz;
-    
-    // only needed if you don't want to use push_back
-    m.data.resize(data_sz);
-    m.data[0] = error[0];
-    m.data[1] = error[1];
-    m.data[2] = error[2];
-    m.data[3] = error[3];
-    calibration_error_pub.publish(m);
+      Eigen::Matrix<double, 4, 1> error = TransformDifference(combined, calculated_delta);
+      const unsigned int data_sz = 4;
+      std_msgs::Float32MultiArray m;
+      
+      m.layout.dim.push_back(std_msgs::MultiArrayDimension());
+      m.layout.dim[0].size = data_sz;
+      
+      // only needed if you don't want to use push_back
+      m.data.resize(data_sz);
+      m.data[0] = error[0];
+      m.data[1] = error[1];
+      m.data[2] = error[2];
+      m.data[3] = error[3];
+      calibration_error_pub.publish(m);
+    }
+    cloud_time_last = cloud_time;
+    last_cloud = global_cloud;
+    odom_time_last = odom_time;
+    std::copy(std::begin(current_pose), std::end(current_pose), std::begin(last_pose));
   }
 }
 
@@ -765,17 +782,16 @@ void Recalibrate() {
 }
 
 void DepthCb(sensor_msgs::PointCloud2 msg) {
-  cloud_time_last = cloud_time;
+//   cloud_time_last = cloud_time;
   cloud_time = msg.header.stamp.toSec();
-  
   pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
   pcl::PCLPointCloud2 pcl_pc2;
   pcl_conversions::toPCL(msg,pcl_pc2);
   pcl::fromPCLPointCloud2(pcl_pc2,pcl_cloud);
   pcl_cloud = VoxelFilter(pcl_cloud);
   OrientCloud(&pcl_cloud);
-  pcl_cloud = CutCloud(pcl_cloud);
-  pcl::copyPointCloud(global_cloud, last_cloud);
+//   pcl_cloud = CutCloud(pcl_cloud);
+//   pcl::copyPointCloud(global_cloud, last_cloud);
   pcl::copyPointCloud(pcl_cloud, global_cloud);
   
   
@@ -840,9 +856,9 @@ void DepthCb(sensor_msgs::PointCloud2 msg) {
 }
 
 void OdomCb(const nav_msgs::Odometry& msg) {
-  odom_time_last = odom_time;
+//   odom_time_last = odom_time;
   odom_time = msg.header.stamp.toSec();
-  std::copy(std::begin(current_pose), std::end(current_pose), std::begin(last_pose));
+//   std::copy(std::begin(current_pose), std::end(current_pose), std::begin(last_pose));
   current_pose[0] = msg.pose.pose.orientation.x;
   current_pose[1] = msg.pose.pose.orientation.y;
   current_pose[2] = msg.pose.pose.orientation.z;
@@ -852,7 +868,7 @@ void OdomCb(const nav_msgs::Odometry& msg) {
   current_pose[6] = msg.pose.pose.position.z;
   if(mode == record_rot || mode == record_trans) {
     RecordOdom(msg);
-  }
+  } 
 }
 
 void PerturbCb(const std_msgs::Int32MultiArray& msg) {

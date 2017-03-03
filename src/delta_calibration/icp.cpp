@@ -216,15 +216,17 @@ Eigen::Matrix<double,4,1> TransformDifference(
   // Find the rotation component
   // Find the angle axis format
   Eigen::AngleAxis<double> angle_axis(difference.rotation());
-  
+  Eigen::Vector3d trans1 = {transform[3], transform[4], transform[5]};
+  Eigen::Vector3d trans2 = {transform_base[3], transform_base[4], transform_base[5]};
   // Get the axis
 //   Eigen::Vector3d normal_axis = angle_axis.axis();
   
   // Recompute the rotation angle
   double combined_angle = angle_axis.angle();
   // Compute Translation
-  Eigen::Matrix<double, 3,1> combined_translation(
-    difference.translation());
+//   Eigen::Matrix<double, 3,1> combined_translation(
+//     difference.translation());
+  Eigen::Vector3d combined_translation = trans1 - trans2;
   output[0] = combined_angle;
   output[1] = combined_angle / angle;
   output[2] = combined_translation.norm();
