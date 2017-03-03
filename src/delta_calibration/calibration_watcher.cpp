@@ -2,6 +2,7 @@
 #include "std_msgs/String.h"
 #include "std_msgs/Float32.h"
 #include "std_msgs/Float32MultiArray.h"
+#include "std_msgs/Int32MultiArray.h"
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/Image.h>
 #include <geometry_msgs/Twist.h>
@@ -16,6 +17,7 @@
 #include <pthread.h>
 #include<delta_calc.h>
 #include<partial_calibrate.h>
+#include <string> 
 
 ros::Publisher ground_error_pub;
 ros::Publisher calibration_error_pub;
@@ -33,6 +35,7 @@ bool x_orth, y_orth, z_orth = false;
 bool x_par, y_par, z_par = false;
 using namespace icp;
 using namespace std;
+string pertubation = "0_1_0_0_0_2_";
 int num_passes = 0;
 double extrinsics[7] = {0, 0, 0, 1, -.087, -.0125, .2870};
 double current_pose[7];
@@ -737,20 +740,21 @@ pcl::PointCloud<pcl::PointXYZ> CutCloud(pcl::PointCloud<pcl::PointXYZ> cloud) {
 }
 
 void Recalibrate() {
-  string file;
-  double* new_cal = partial_calibrate::turtlebot_calibrate(file);
+  cout << pertubation << endl;
+  double* new_cal = partial_calibrate::turtlebot_calibrate(pertubation);
   double* new_quat = AA2Quat(new_cal);
+  PrintPose(new_cal);
   extrinsics[0] = new_quat[0];
   extrinsics[1] = new_quat[1];
   extrinsics[2] = new_quat[2];
   extrinsics[3] = new_quat[3];
-  extrinsics[4] = new_quat[4];
-  extrinsics[5] = new_quat[5];
-  extrinsics[6] = new_quat[6];
+  extrinsics[4] = new_quat[4] + extrinsics[4];
+  extrinsics[5] = new_quat[5] + extrinsics[5];
+  extrinsics[6] = extrinsics[6];
   geometry_msgs::PoseStamped message;
   message.pose.position.x = extrinsics[4];
   message.pose.position.y = extrinsics[5];
-  message.pose.position.z = current_pose[6];
+  message.pose.position.z = extrinsics[6];
   message.pose.orientation.x = extrinsics[0];
   message.pose.orientation.y = extrinsics[1];
   message.pose.orientation.z = extrinsics[2];
@@ -851,6 +855,15 @@ void OdomCb(const nav_msgs::Odometry& msg) {
   }
 }
 
+void PerturbCb(const std_msgs::Int32MultiArray& msg) {
+  string s = "";
+  for(size_t i = 0; i < 6; ++i) {
+    s = s + std::to_string(msg.data[i]) + "_";
+  }
+  cout << s << endl;
+  pertubation = s;
+}
+
 void CommandCb(const std_msgs::String::ConstPtr& msg)
 {
   ROS_INFO("I heard: [%s]", msg->data.c_str());
@@ -911,6 +924,7 @@ int main(int argc, char **argv) {
   ros::Subscriber depth_sub = n.subscribe("/camera/depth/points", 1, DepthCb);
   ros::Subscriber odom_sub = n.subscribe("/odom", 1, OdomCb);
   ros::Subscriber command_sub = n.subscribe("/calibration/commands", 1, CommandCb);
+  ros::Subscriber pertubation_sub = n.subscribe("/calibration/perturb", 1, PerturbCb);
   ros::Subscriber status_sub = n.subscribe("/move_base/status", 1, StatusCb);
   current_pose[0] = 0;
   current_pose[1] = 0;
