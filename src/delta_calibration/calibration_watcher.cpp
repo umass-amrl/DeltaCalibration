@@ -35,8 +35,9 @@ bool x_orth, y_orth, z_orth = false;
 bool x_par, y_par, z_par = false;
 using namespace icp;
 using namespace std;
-string pertubation = "brass_cal/0_0_0_0_0_0_";
+string pertubation = "brass_cal/1_1_1_1_1_1_";
 int num_passes = 0;
+double og_extrinsics[7] = {0, 0, 0, 1, -.087, -.0125, .2870};
 double extrinsics[7] = {0, 0, 0, 1, -.087, -.0125, .2870};
 double current_pose[7];
 double last_pose[7];
@@ -255,6 +256,7 @@ void CheckCalibration() {
 //This name is terrible, fix it Jarrett
 double* TransformTransform(double* base_transform, double* transform) {
   //Create the eigen transform from the first pose
+  cout << "Transform transform" << endl;
   Eigen::Matrix<double,3,1> axis(transform[0], transform[1], transform[2]);
   const double angle = axis.norm();
   if(angle != 0) {
@@ -765,9 +767,11 @@ void Recalibrate() {
   extrinsics[1] = new_quat[1];
   extrinsics[2] = new_quat[2];
   extrinsics[3] = new_quat[3];
-  extrinsics[4] = new_quat[4] + extrinsics[4];
-  extrinsics[5] = new_quat[5] + extrinsics[5];
-  extrinsics[6] = extrinsics[6];
+  extrinsics[4] = new_cal[3] + og_extrinsics[4];
+  extrinsics[5] = new_cal[4] + og_extrinsics[5];
+  extrinsics[6] = og_extrinsics[6];
+  PrintPose(extrinsics);
+  cout << extrinsics[6] << endl;
   geometry_msgs::PoseStamped message;
   message.pose.position.x = extrinsics[4];
   message.pose.position.y = extrinsics[5];
