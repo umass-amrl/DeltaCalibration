@@ -35,7 +35,7 @@ bool x_orth, y_orth, z_orth = false;
 bool x_par, y_par, z_par = false;
 using namespace icp;
 using namespace std;
-string pertubation = "0_1_0_0_0_2_";
+string pertubation = "brass_cal/0_0_0_0_0_0_";
 int num_passes = 0;
 double extrinsics[7] = {0, 0, 0, 1, -.087, -.0125, .2870};
 double current_pose[7];
@@ -128,7 +128,7 @@ double* AA2Quat(double* AA) {
   Eigen::Vector3d aa= {AA[0], AA[1], AA[2]};
   double* q = new double[6];
   double angle = aa.norm();
-  if( angle) {
+  if( !angle) {
     q[0] = 0;
     q[1] = 0;
     q[2] = 0;
@@ -291,10 +291,7 @@ double* TransformTransform(double* base_transform, double* transform) {
 }
 
 void DeltaErr() {
-//   cout << "cloud time: " << cloud_time << " odom_time: " << odom_time << endl;
-//   cout << "cloud time: " << cloud_time_last << " odom_time: " << odom_time_last << endl;
-//   cout << fabs(cloud_time-odom_time) << endl;
-//   cout << fabs(cloud_time_last-odom_time_last) << endl;
+
   if(DoubleEquals2(cloud_time, odom_time)) { 
     
     if (DoubleEquals2(cloud_time_last, odom_time_last) && (!DoubleEquals2(cloud_time_last, 0))
@@ -346,22 +343,25 @@ void DeltaErr() {
       Eigen::Vector3d uncertainty_tz = {0,0,1};
       delta_calc::StripUncertainty(uncertainty_t, uncertainty_r, calculated_delta);
       delta_calc::StripUncertainty(uncertainty_t, uncertainty_r, combined);
-//       delta_calc::StripUncertainty(uncertainty_tz, uncertainty_ry, calculated_delta);
-// //       delta_calc::StripUncertainty(uncertainty_tz, uncertainty_rx, calculated_delta);
-
+      
       Eigen::Matrix<double, 4, 1> error = TransformDifference(combined, calculated_delta);
-      const unsigned int data_sz = 4;
+      Eigen::Vector3d transformed_odom_rot = {combined[0], combined[1], combined[2]};
+      Eigen::Vector3d transformed_odom_trans = {combined[3], combined[4], combined[5]};
+      const unsigned int data_sz = 6;
       std_msgs::Float32MultiArray m;
       
       m.layout.dim.push_back(std_msgs::MultiArrayDimension());
       m.layout.dim[0].size = data_sz;
-      
+      float rot_mag = transformed_odom_rot.norm();
+      float trans_mag = transformed_odom_trans.norm();
       // only needed if you don't want to use push_back
       m.data.resize(data_sz);
       m.data[0] = error[0];
       m.data[1] = error[1];
       m.data[2] = error[2];
       m.data[3] = error[3];
+      m.data[4] = rot_mag;
+      m.data[5] = trans_mag;
       calibration_error_pub.publish(m);
     }
     cloud_time_last = cloud_time;
@@ -872,7 +872,7 @@ void OdomCb(const nav_msgs::Odometry& msg) {
 }
 
 void PerturbCb(const std_msgs::Int32MultiArray& msg) {
-  string s = "";
+  string s = "brass_cal/";
   for(size_t i = 0; i < 6; ++i) {
     s = s + std::to_string(msg.data[i]) + "_";
   }
@@ -891,7 +891,6 @@ void CommandCb(const std_msgs::String::ConstPtr& msg)
   if(ground_recalibrate.compare(msg->data.c_str()) == 0) {
     GroundRecalibrate();
   }
-  
 }
 
 void StatusCb(const actionlib_msgs::GoalStatusArray::ConstPtr& msg) {
@@ -913,7 +912,6 @@ void StatusCb(const actionlib_msgs::GoalStatusArray::ConstPtr& msg) {
       message.header.frame_id = "map";
       move_pub.publish(message);
     }
-    
   }
 }
 

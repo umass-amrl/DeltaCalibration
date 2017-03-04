@@ -582,10 +582,10 @@ void PartialCalibrateRwT(
   double* turtlebot_calibrate(string filename) {
     
     cout << "reading deltas" << endl;
-    string file1 = filename + "rot.txt";
-    string file2 = filename + "trans.txt";
-    string file3 = filename + "uncR.txt";
-    string file4 = filename + "uncT.txt";
+    string file1 = filename + "rot.xt";
+    string file2 = filename + "trans.xt";
+    string file3 = filename + "uncR.xt";
+    string file4 = filename + "uncT.xt";
     vector<vector<double> > deltas_1;
     vector<vector<double> > deltas_2;
     vector<vector<double> > deltasT_1;
