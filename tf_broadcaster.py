@@ -39,7 +39,6 @@ def handle_calibration_update(msg):
 def handle_turtle_pose(msg):
     br = tf.TransformBroadcaster() 
     
-    print rotation
     br.sendTransform((translation[0],
                       translation[1],
                       translation[2]),
