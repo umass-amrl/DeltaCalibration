@@ -159,9 +159,19 @@ Eigen::Transform<double, 3, Eigen::Affine> TransformUncertainty(
       // Find the angle axis format
       
 //       trans = trans.dot(ur)*ur;
-      trans = trans - (trans.dot(ut)*ut);
-    } else {
-      trans = trans - (trans.dot(ut)*ut);
+    }
+    if(trans.norm() != 0) {
+      if(ut[0] > .9) {
+	Eigen::Vector3d x = {1,0,0};
+	trans = trans - (trans.dot(x)*x);
+      } else if(ut[1] > .9) {
+	Eigen::Vector3d y = {0,1,0};
+	trans = trans - (trans.dot(y)*y);
+      } else if(ut[2] > .9) {
+	Eigen::Vector3d z = {0,0,1};
+	trans = trans - (trans.dot(z)*z);
+      }
+      
     }
     Eigen::AngleAxis<double> angle_axis(R.rotation());
     
@@ -259,27 +269,49 @@ void CalculateDelta(
 void ExtractUncertainty(
     const vector<Eigen::Vector4d>& normal_equations,
     Eigen::Vector3d* uncertainty_T,
-    Eigen::Vector3d* uncertainty_R) {
+    Eigen::Vector3d* uncertainty_R
+ 		      ) {
   
   Eigen::Vector3d rot_u;
-  Eigen::Vector3d trans_u = {100, 0, 0};
+  Eigen::Vector3d trans_u = {1, 1, 1};
+   Eigen::Vector3d partial_u = {100, 0, 0};
   bool first_normal = true;
   for(size_t i = 0; i < normal_equations.size(); i++) {
     Eigen::Vector4d normal_equation = normal_equations[i];
     Eigen::Vector3d normal = {normal_equation[0],normal_equation[1], normal_equation[2]};
     if(!first_normal) {
-      if(!DoubleEquals(abs(rot_u.dot(normal)), 1) && !DoubleEquals(rot_u.norm(), 0)) {
-        if(DoubleEquals(trans_u.norm(), 100)) {
-          trans_u = rot_u.cross(normal);
-        } 
+      if(!DoubleEquals(abs(rot_u.dot(normal)), 1) || DoubleEquals(rot_u.norm(), 0)) {
+        if(DoubleEquals(partial_u.norm(), 100)) {
+          partial_u = rot_u.cross(normal);
+	  cout << "PARTIALU" <<endl;
+	  cout<< partial_u << endl;
+	  if(abs(partial_u[0]) > .5) {
+	    trans_u[0] = 1;
+	  } else {
+	    trans_u[0] = 0;
+	  }
+	  if(abs(partial_u[1]) > .3) {
+	    trans_u[1] = 1;
+	  }   else {
+	    trans_u[1] = 0;
+	  }
+	  if(abs(partial_u[2]) > .3) {
+	    trans_u[2] = 1;
+	  } else {
+	    trans_u[2] = 0;
+	  }
+        }
+        if(!DoubleEquals(abs(rot_u.dot(normal)), 1)) {
+	  rot_u[0] = 0;
+	  rot_u[1] = 0;
+	  rot_u[2] = 0;
+	}
       } else {
-          if(!DoubleEquals(abs(trans_u.dot(normal)), 0)) {
+          if(!DoubleEquals(partial_u.norm(), 100) && !DoubleEquals(abs(partial_u.dot(normal)), 0)) {
             trans_u = {0,0,0};
           }
       }
-        rot_u[0] = 0;
-        rot_u[1] = 0;
-        rot_u[2] = 0;
+        
       } else {
       first_normal = false;
       rot_u = normal;

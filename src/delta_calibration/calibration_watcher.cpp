@@ -256,7 +256,7 @@ void CheckCalibration() {
 //This name is terrible, fix it Jarrett
 double* TransformTransform(double* base_transform, double* transform) {
   //Create the eigen transform from the first pose
-  cout << "Transform transform" << endl;
+//   cout << "Transform transform" << endl;
   Eigen::Matrix<double,3,1> axis(transform[0], transform[1], transform[2]);
   const double angle = axis.norm();
   if(angle != 0) {
@@ -277,10 +277,11 @@ double* TransformTransform(double* base_transform, double* transform) {
   
   // T2 = R^-1 (R_1T + T_1 - T)
   Vector3d ext_tran = {transform[3], transform[4], transform[5]};
+//   ext_tran = 10*ext_tran;
   Vector3d rot_vec = {base_transform[0], base_transform[1], base_transform[2]};
   Vector3d trans_vec = {base_transform[3], base_transform[4], base_transform[5]};
   rot_vec = rotation.inverse() * rot_vec;
-  trans_vec = trans_vec + (rotation2 * ext_tran) - ext_tran;
+  trans_vec = trans_vec + ((rotation2 * ext_tran) - ext_tran);
   trans_vec = rotation.inverse() * trans_vec;
   double* ret_val = new double[6];
   ret_val[0] = rot_vec[0];
@@ -297,7 +298,7 @@ void DeltaErr() {
   if(DoubleEquals2(cloud_time, odom_time)) { 
     
     if (DoubleEquals2(cloud_time_last, odom_time_last) && (!DoubleEquals2(cloud_time_last, 0))
-      && fabs(cloud_time - cloud_time_last) < .5) {  
+      && fabs(cloud_time - cloud_time_last) < .3) {  
     
       double* transform = DeltaFromOdom(last_pose, current_pose);
       pcl::PointCloud<pcl::PointXYZ> cloud = last_cloud;
@@ -339,23 +340,27 @@ void DeltaErr() {
       Eigen::Vector3d uncertainty_t;
       Eigen::Vector3d uncertainty_r;
       delta_calc::ExtractUncertainty(plane_normals, &uncertainty_t, &uncertainty_r);
+      cout << "Uncertainty" << endl;
       cout << uncertainty_t << endl;
-      Eigen::Vector3d uncertainty_ry = {0,1,0};
-      Eigen::Vector3d uncertainty_rx = {1,0,0};
-      Eigen::Vector3d uncertainty_tz = {0,0,1};
       delta_calc::StripUncertainty(uncertainty_t, uncertainty_r, calculated_delta);
       delta_calc::StripUncertainty(uncertainty_t, uncertainty_r, combined);
       
       Eigen::Matrix<double, 4, 1> error = TransformDifference(combined, calculated_delta);
       Eigen::Vector3d transformed_odom_rot = {combined[0], combined[1], combined[2]};
       Eigen::Vector3d transformed_odom_trans = {combined[3], combined[4], combined[5]};
+      Eigen::Vector3d calculated_rot = {calculated_delta[0], calculated_delta[1], calculated_delta[2]};
+      Eigen::Vector3d calculated_trans = {calculated_delta[3], calculated_delta[4], calculated_delta[5]};
       const unsigned int data_sz = 6;
       std_msgs::Float32MultiArray m;
-      
+      cout << "Poses" << endl;
+      PrintPose(combined);
+      PrintPose(calculated_delta);
+      cout << "Error: " << endl;
+      cout << error << endl;
       m.layout.dim.push_back(std_msgs::MultiArrayDimension());
       m.layout.dim[0].size = data_sz;
-      float rot_mag = transformed_odom_rot.norm();
-      float trans_mag = transformed_odom_trans.norm();
+      float rot_mag = transformed_odom_rot.norm() + calculated_rot.norm();
+      float trans_mag = transformed_odom_trans.norm() + calculated_trans.norm();
       // only needed if you don't want to use push_back
       m.data.resize(data_sz);
       m.data[0] = error[0];
@@ -364,6 +369,7 @@ void DeltaErr() {
       m.data[3] = error[3];
       m.data[4] = rot_mag;
       m.data[5] = trans_mag;
+      cout << m.data[4] << " " << m.data[5] << endl;
       calibration_error_pub.publish(m);
     }
     cloud_time_last = cloud_time;

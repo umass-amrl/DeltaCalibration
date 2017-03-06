@@ -230,7 +230,7 @@ Eigen::Matrix<double,4,1> TransformDifference(
   output[0] = combined_angle;
   output[1] = combined_angle / angle;
   output[2] = combined_translation.norm();
-  output[3] = (double)combined_translation.norm() / trans.norm();
+  output[3] = (double)combined_translation.norm() / trans2.norm();
  
   
   
@@ -1685,7 +1685,7 @@ pcl::PointCloud<pcl::Normal> GetNormals(
   ne.setRadiusSearch (0.03);
 
   // Compute the features
-  cout << "Computing normal" << endl;
+//   cout << "Computing normal" << endl;
   ne.compute (*cloud_normals);
 
   return *cloud_normals;
@@ -1900,7 +1900,7 @@ void ICP(
   // Tolerance for RMSE.
   static const double kToleranceError = 0.00001;
   // The maximum number of overall iterations.
-  static const int kMaxIterations = 80;
+  static const int kMaxIterations = 50;
   // The maximum number of repeat iterations while the RMSE is unchanged.
   static const int kMaxRepeatIterations = 5;
   double rmse = 1000000;
