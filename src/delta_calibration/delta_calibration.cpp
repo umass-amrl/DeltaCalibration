@@ -304,15 +304,16 @@ void ExtractUncertainty(
 	  rot_u[1] = 0;
 	  rot_u[2] = 0;
 	}
-      } else {
+      } 
           if(!DoubleEquals(partial_u.norm(), 100) && !DoubleEquals(abs(partial_u.dot(normal)), 0)) {
             trans_u = {0,0,0};
-          }
-      }
+	  }
+      
         
       } else {
       first_normal = false;
       rot_u = normal;
+      trans_u = trans_u - rot_u;
     }
   }
   *uncertainty_T = trans_u;
