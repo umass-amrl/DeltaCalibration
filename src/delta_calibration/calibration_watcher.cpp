@@ -281,8 +281,8 @@ double* TransformTransform(double* base_transform, double* transform) {
   Vector3d rot_vec = {base_transform[0], base_transform[1], base_transform[2]};
   Vector3d trans_vec = {base_transform[3], base_transform[4], base_transform[5]};
   rot_vec = rotation.inverse() * rot_vec;
-  trans_vec = trans_vec + ((rotation2 * ext_tran) - ext_tran);
   trans_vec = rotation.inverse() * trans_vec;
+  trans_vec = trans_vec + ((rotation2 * ext_tran) - ext_tran);
   double* ret_val = new double[6];
   ret_val[0] = rot_vec[0];
   ret_val[1] = rot_vec[1];
@@ -298,7 +298,7 @@ void DeltaErr() {
   if(DoubleEquals2(cloud_time, odom_time)) { 
     
     if (DoubleEquals2(cloud_time_last, odom_time_last) && (!DoubleEquals2(cloud_time_last, 0))
-      && fabs(cloud_time - cloud_time_last) < .3) {  
+      && fabs(cloud_time - cloud_time_last) < .5) {  
     
       double* transform = DeltaFromOdom(last_pose, current_pose);
       pcl::PointCloud<pcl::PointXYZ> cloud = last_cloud;
