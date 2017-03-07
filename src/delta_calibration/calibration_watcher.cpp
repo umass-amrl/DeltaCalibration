@@ -35,7 +35,7 @@ bool x_orth, y_orth, z_orth = false;
 bool x_par, y_par, z_par = false;
 using namespace icp;
 using namespace std;
-string pertubation = "brass_cal/1_1_1_1_1_1_";
+string pertubation = "brass_cal/0_0_0_0_0_0_";
 int num_passes = 0;
 double og_extrinsics[7] = {0, 0, 0, 1, -.087, -.0125, .2870};
 double extrinsics[7] = {0, 0, 0, 1, -.087, -.0125, .2870};
@@ -340,8 +340,8 @@ void DeltaErr() {
       Eigen::Vector3d uncertainty_t;
       Eigen::Vector3d uncertainty_r;
       delta_calc::ExtractUncertainty(plane_normals, &uncertainty_t, &uncertainty_r);
-//       cout << "Uncertainty" << endl;
-//       cout << uncertainty_t << endl;
+      cout << "Uncertainty" << endl;
+      cout << uncertainty_t << endl;
       delta_calc::StripUncertainty(uncertainty_t, uncertainty_r, calculated_delta);
       delta_calc::StripUncertainty(uncertainty_t, uncertainty_r, combined);
       

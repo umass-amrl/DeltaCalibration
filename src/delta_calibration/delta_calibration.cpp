@@ -164,10 +164,10 @@ Eigen::Transform<double, 3, Eigen::Affine> TransformUncertainty(
       if(ut[0] > .9) {
 	Eigen::Vector3d x = {1,0,0};
 	trans = trans - (trans.dot(x)*x);
-      } else if(ut[1] > .9) {
+      } if(ut[1] > .9) {
 	Eigen::Vector3d y = {0,1,0};
 	trans = trans - (trans.dot(y)*y);
-      } else if(ut[2] > .9) {
+      } if(ut[2] > .9) {
 	Eigen::Vector3d z = {0,0,1};
 	trans = trans - (trans.dot(z)*z);
       }
