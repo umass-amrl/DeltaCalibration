@@ -973,7 +973,7 @@ void PlaneCorrections(
         //std::cout << summary.FullReport() << "\n";
         rmse =
                 sqrt(summary.final_cost / static_cast<double>(summary.num_residuals));
-        fprintf(stdout, "RMSE: %f \n", rmse);
+//         fprintf(stdout, "RMSE: %f \n", rmse);
         ceres::Problem::EvaluateOptions evalOptions = ceres::Problem::EvaluateOptions();
 
     }

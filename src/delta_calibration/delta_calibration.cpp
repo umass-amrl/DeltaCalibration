@@ -283,8 +283,6 @@ void ExtractUncertainty(
       if(!DoubleEquals(abs(rot_u.dot(normal)), 1) || DoubleEquals(rot_u.norm(), 0)) {
         if(DoubleEquals(partial_u.norm(), 100)) {
           partial_u = rot_u.cross(normal);
-	  cout << "PARTIALU" <<endl;
-	  cout<< partial_u << endl;
 	  if(abs(partial_u[0]) > .5) {
 	    trans_u[0] = 1;
 	  } else {

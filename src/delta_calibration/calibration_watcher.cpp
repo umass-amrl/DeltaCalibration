@@ -191,7 +191,7 @@ double* DeltaFromOdom(double* current,
   // Recompute the rotation angle
   double test_angle = test.angle();
   Eigen::Vector3d test_trans = test_axis * test_angle;
-  cout << test_trans[0] << " " << test_trans[1] << " " << test_trans[2] << endl;
+//   cout << test_trans[0] << " " << test_trans[1] << " " << test_trans[2] << endl;
   transform = transform;
       
   // Find the rotation component
@@ -340,8 +340,8 @@ void DeltaErr() {
       Eigen::Vector3d uncertainty_t;
       Eigen::Vector3d uncertainty_r;
       delta_calc::ExtractUncertainty(plane_normals, &uncertainty_t, &uncertainty_r);
-      cout << "Uncertainty" << endl;
-      cout << uncertainty_t << endl;
+//       cout << "Uncertainty" << endl;
+//       cout << uncertainty_t << endl;
       delta_calc::StripUncertainty(uncertainty_t, uncertainty_r, calculated_delta);
       delta_calc::StripUncertainty(uncertainty_t, uncertainty_r, combined);
       
@@ -352,11 +352,11 @@ void DeltaErr() {
       Eigen::Vector3d calculated_trans = {calculated_delta[3], calculated_delta[4], calculated_delta[5]};
       const unsigned int data_sz = 6;
       std_msgs::Float32MultiArray m;
-      cout << "Poses" << endl;
-      PrintPose(combined);
-      PrintPose(calculated_delta);
-      cout << "Error: " << endl;
-      cout << error << endl;
+//       cout << "Poses" << endl;
+//       PrintPose(combined);
+//       PrintPose(calculated_delta);
+//       cout << "Error: " << endl;
+//       cout << error << endl;
       m.layout.dim.push_back(std_msgs::MultiArrayDimension());
       m.layout.dim[0].size = data_sz;
       float rot_mag = transformed_odom_rot.norm() + calculated_rot.norm();
@@ -369,7 +369,7 @@ void DeltaErr() {
       m.data[3] = error[3];
       m.data[4] = rot_mag;
       m.data[5] = trans_mag;
-      cout << m.data[4] << " " << m.data[5] << endl;
+//       cout << m.data[4] << " " << m.data[5] << endl;
       calibration_error_pub.publish(m);
     }
     cloud_time_last = cloud_time;
