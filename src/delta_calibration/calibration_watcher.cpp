@@ -352,11 +352,11 @@ void DeltaErr() {
       Eigen::Vector3d calculated_trans = {calculated_delta[3], calculated_delta[4], calculated_delta[5]};
       const unsigned int data_sz = 6;
       std_msgs::Float32MultiArray m;
-//       cout << "Poses" << endl;
-//       PrintPose(combined);
-//       PrintPose(calculated_delta);
-//       cout << "Error: " << endl;
-//       cout << error << endl;
+      cout << "Poses" << endl;
+      PrintPose(combined);
+      PrintPose(calculated_delta);
+      cout << "Error: " << endl;
+      cout << error << endl;
       m.layout.dim.push_back(std_msgs::MultiArrayDimension());
       m.layout.dim[0].size = data_sz;
       float rot_mag = transformed_odom_rot.norm() + calculated_rot.norm();
@@ -369,7 +369,7 @@ void DeltaErr() {
       m.data[3] = error[3];
       m.data[4] = rot_mag;
       m.data[5] = trans_mag;
-//       cout << m.data[4] << " " << m.data[5] << endl;
+      cout << m.data[4] << " " << m.data[5] << endl;
       calibration_error_pub.publish(m);
     }
     cloud_time_last = cloud_time;
