@@ -230,7 +230,11 @@ Eigen::Matrix<double,4,1> TransformDifference(
   output[0] = combined_angle;
   output[1] = combined_angle / angle;
   output[2] = combined_translation.norm();
-  output[3] = (double)combined_translation.norm() / trans2.norm();
+  if(!DoubleEquals(trans2.norm(), 0)) {
+    output[3] = (double)combined_translation.norm() / trans2.norm();
+  } else {
+    output[3] = (double)combined_translation.norm();
+  }
  
   
   
