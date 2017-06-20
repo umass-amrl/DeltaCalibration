@@ -42,11 +42,11 @@ for i=1:N
   a1x = RandomTransform6D(max_delta_angle, max_delta_translation)';
   a1y = RandomTransform6D(max_delta_angle, max_delta_translation)';
   a1z = RandomTransform6D(max_delta_angle, max_delta_translation)';
-  
+
   a1x2 = RandomXRotationAA(max_delta_angle)';
   a1y2 = RandomYRotationAA(max_delta_angle)';
   a1z2 = RandomZRotationAA(max_delta_angle)';
-  
+
   a2x = A1toA2(A', a1x');
   a2y = A1toA2(A', a1y');
   a2z = A1toA2(A', a1z');
@@ -54,26 +54,26 @@ for i=1:N
   a1y = AddNoiseToTransform6D(a1y', noise_angular, noise_translation)'
   a2x = AddNoiseToTransform6D(a2x', noise_angular, noise_translation)'
   a2y = AddNoiseToTransform6D(a2y', noise_angular, noise_translation)'
-  a1x_ux = StripRotation(a1x,uy);  
+  a1x_ux = StripRotation(a1x,uy);
   a1x_uy = StripRotation(a1x,ux);
   a1y_ux = StripRotation(a1y, uy);
   a1y_uy = StripRotation(a1y, ux);
 
-  a1x_ux = StripTranslation(a1x_ux,ux);  
+  a1x_ux = StripTranslation(a1x_ux,ux);
   a1x_uy = StripTranslation(a1x_uy,uy);
   a1y_ux = StripTranslation(a1y_ux, ux);
   a1y_uy = StripTranslation(a1y_uy, uy);
-  
+
 %   A1 = [A1; a1x];
 %   A1 = [A1; a1y];
 %   A1 = [A1; a1x];
 %   A1 = [A1; a1y];
-%   
+%
   A1 = [A1; a1x_ux];
   A1 = [A1; a1y_ux];
   A1 = [A1; a1x_uy];
   A1 = [A1; a1y_uy];
-  
+
   A2 = [A2; a2x 0 0];
   A2 = [A2; a2y 0 0];
   A2 = [A2; a2x 0 0];
@@ -90,7 +90,7 @@ for i=1:N
   U1t = [U1t ; ux];
   U1t = [U1t ; uy];
   U1t = [U1t ; uy];
-  
+
   U1r = [U1r ; uy];
   U1r = [U1r ; uy];
   U1r = [U1r ; ux];
@@ -99,17 +99,17 @@ for i=1:N
 %   U1t = [U1t ; u0];
 %   U1t = [U1t ; u0];
 %   U1t = [U1t ; u0];
-%   
+%
   U2t = [U2t ; u0];
   U2t = [U2t ; u0];
   U2t = [U2t ; u0];
   U2t = [U2t ; u0];
-  
+
   U2r = [U2r ; u0];
   U2r = [U2r ; u0];
   U2r = [U2r ; u0];
   U2r = [U2r ; u0];
-  
+
   last_t1 = t1;
   last_t2 = t2;
   T1 = [T1; t1];
@@ -132,7 +132,7 @@ for i=1:N
   time = [time; count + 1];
   time = [time; count + 1];
   time = [time; count + 1];
-  
+
   %A2(end,:) = AddNoiseToTransform6D(A2(end,:)', noise_angular, noise_translation)';
 end
 
@@ -150,6 +150,8 @@ save('GenNavData.mat', 'odomData');
 dlmwrite('generated_deltas.txt', C0, ' ');
 dlmwrite('generated_uncertaintiest.txt', Ut, ' ');
 dlmwrite('generated_uncertaintiesr.txt', Ur, ' ');
+dlmwrite('T_generated_uncertaintiest.txt', Ut, ' ');
+dlmwrite('T_generated_uncertaintiesr.txt', Ur, ' ');
 size(C0);
 !../../../bin/partial_calibrate
 B_cal = Test3KinectNav();
@@ -159,7 +161,7 @@ A_multiCal = [B_cal.rot B_cal.tran];
 A_multiCal = A_multiCal(2,:)
 q = aa2quat(A');
 fprintf('\n %f degrees about [%f %f %f]\n\n',...
-        180 / pi * 2.0 * acos(q(1)),... 
+        180 / pi * 2.0 * acos(q(1)),...
         q(2:4) / norm(q(2:4)));
 error_aa = rotm2aa(inv(aa2rotm(A(1:3)')) * aa2rotm(A_cal(1:3)'));
 r_err = norm(error_aa) / pi * 180

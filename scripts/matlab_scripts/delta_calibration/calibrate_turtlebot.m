@@ -46,8 +46,6 @@ N = size(C0, 1);
 AA0 = C0(:,1:3);
 AA1 = C0(:,9:11);
 
-
-
 % Extract angle magnitude data
 A0 = zeros(N,1);
 A1 = zeros(N,1);
@@ -206,22 +204,22 @@ partialR;
 %   Raa;
 %   RtN = Rt / norm(Rt);
 %   diffRR = 180/pi *abs(atan2(norm(cross(Raa/norm(Raa),Raa/norm(Raa))),dot(Raa/ norm(Raa),Raa/norm(Raa))));
-%  
+%
 %   diffCR = 180/pi * abs(atan2(norm(cross(RtN,Raa/norm(Raa))),dot(RtN,Raa/norm(Raa))));
 %   diffCR_2 = abs(diffCR - 180);
-%   
+%
 %   c = c/norm(c);
 %   if diffCR_2 < diffCR
 %     cTotal = [cTotal; c];
 %   else
-%     cTotal = [cTotal; c]; 
+%     cTotal = [cTotal; c];
 %   end
 %   %disp(c);
 % end
 
-%axisDiff = bsxfun(@minus,cTotal(2:end, :),Raa/norm(Raa)); 
+%axisDiff = bsxfun(@minus,cTotal(2:end, :),Raa/norm(Raa));
 %axisDiff_Norm = sqrt(sum(abs(axisDiff).^2,2))
-axisDiff_Norm = cTotal(2:end, :);    
+axisDiff_Norm = cTotal(2:end, :);
 % file;
 % fileID = fopen(strcat(file, '.txt'),'w');
 % fprintf(fileID, '%f ', Raa);

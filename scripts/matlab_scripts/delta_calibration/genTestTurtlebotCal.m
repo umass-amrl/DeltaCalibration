@@ -33,7 +33,7 @@ time = [0];
 count = 0;
 for i=1:N
   Ar = RandomZAxisRotate(max_delta_angle, 0)';
-  
+
   At = RandomGroundTranslation6D(0, max_delta_translation)';
   a2r = A1toA2(A', Ar');
   a2t =  A1toA2(A', At');
@@ -45,7 +45,7 @@ for i=1:N
   At = AddNoiseToTransform6D(At', noise_angular, noise_translation)'
   A1 = [A1; Ar 0 0];
   A1T = [A1T; At 0 0];
-  
+
   V1 = [V1; var];
   V2 = [V2; var];
   V1 = [V1; var];
@@ -79,6 +79,8 @@ dlmwrite('generated_deltas_rot.txt', C0, ' ');
 dlmwrite('generated_deltas_trans.txt', C1, ' ');
 dlmwrite('generated_uncertaintiest.txt', Ut, ' ');
 dlmwrite('generated_uncertaintiesr.txt', Ur, ' ');
+dlmwrite('T_generated_uncertaintiest.txt', Ut, ' ');
+dlmwrite('T_generated_uncertaintiesr.txt', Ur, ' ');
 B_cal = Test3KinectNav();
 
 A_multiCal = [B_cal.rot B_cal.tran];

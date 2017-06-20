@@ -1,6 +1,6 @@
 #include "delta_calibration/icp.h"
-#include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/filters/extract_indices.h>
+#include <pcl/segmentation/sac_segmentation.h>
 using std::size_t;
 using std::vector;
 using namespace std;
@@ -9,7 +9,7 @@ using Eigen::Vector3d;
 const float nn_dist = .05;
 float neighbor_dist = .5;
 
-//Intialize empty publishers
+// Intialize empty publishers
 ros::Publisher cloud_pub;
 ros::Publisher cloud_pub_2;
 ros::Publisher cloud_pub_3;
@@ -30,15 +30,15 @@ sensor_msgs::PointCloud2 bmodel_cloud;
 ros::Publisher marker_pub;
 ros::Publisher markerArray_pub;
 
-using namespace icp; 
+using namespace icp;
 // Signal handler for breaks (Ctrl-C)
 void HandleStop(int i) {
   printf("\nTerminating.\n");
   exit(0);
 }
 
-void GeometryTransform(geometry_msgs::Point* point, double* transform) {
-  Eigen::Matrix<double,3,1> point_eig;
+void GeometryTransform(geometry_msgs::Point *point, double *transform) {
+  Eigen::Matrix<double, 3, 1> point_eig;
   point_eig[0] = point->x;
   point_eig[1] = point->y;
   point_eig[2] = point->z;
@@ -48,19 +48,19 @@ void GeometryTransform(geometry_msgs::Point* point, double* transform) {
   point->z = point_eig[2];
 }
 
-vector<pcl::PointCloud<pcl::PointXYZ> > getPlanes(
-    pcl::PointCloud<pcl::PointXYZ> cloud,
-    vector<Eigen::Vector4d>* normal_equations,
-    vector<Eigen::Vector3d>* centroids
-                                                 ) {
+vector<pcl::PointCloud<pcl::PointXYZ>>
+getPlanes(pcl::PointCloud<pcl::PointXYZ> cloud,
+          vector<Eigen::Vector4d> *normal_equations,
+          vector<Eigen::Vector3d> *centroids) {
 
-  vector<pcl::PointCloud<pcl::PointXYZ> > output;
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>),
-  cloud_p (new pcl::PointCloud<pcl::PointXYZ>),
-  cloud_f (new pcl::PointCloud<pcl::PointXYZ>);
+  vector<pcl::PointCloud<pcl::PointXYZ>> output;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(
+      new pcl::PointCloud<pcl::PointXYZ>),
+      cloud_p(new pcl::PointCloud<pcl::PointXYZ>),
+      cloud_f(new pcl::PointCloud<pcl::PointXYZ>);
 
-
-  // // Create the filtering object: downsample the dataset using a leaf size of 1cm
+  // // Create the filtering object: downsample the dataset using a leaf size of
+  // 1cm
   // pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
   // sor.setInputCloud (cloud_blob);
   // sor.setLeafSize (0.01f, 0.01f, 0.01f);
@@ -69,48 +69,49 @@ vector<pcl::PointCloud<pcl::PointXYZ> > getPlanes(
   // Convert to the templated PointCloud
   cloud_filtered = cloud.makeShared();
   vector<Eigen::Vector4d> equations;
-  pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ());
-  pcl::PointIndices::Ptr inliers (new pcl::PointIndices ());
+  pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients());
+  pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
   // Create the segmentation object
   pcl::SACSegmentation<pcl::PointXYZ> seg;
   // Optional
-  seg.setOptimizeCoefficients (true);
+  seg.setOptimizeCoefficients(true);
   // Mandatory
-  seg.setModelType (pcl::SACMODEL_PLANE);
-  seg.setMethodType (pcl::SAC_RANSAC);
-  seg.setMaxIterations (1000);
-  seg.setDistanceThreshold (0.01);
+  seg.setModelType(pcl::SACMODEL_PLANE);
+  seg.setMethodType(pcl::SAC_RANSAC);
+  seg.setMaxIterations(1000);
+  seg.setDistanceThreshold(0.01);
 
   // Create the filtering object
   pcl::ExtractIndices<pcl::PointXYZ> extract;
 
   int i = 0;
-  //nr_points = (int) cloud_filtered->points.size ();
+  // nr_points = (int) cloud_filtered->points.size ();
   // While 30% of the original cloud is still there
   int num_planes = 0;
-  while (num_planes < 3)
-  {
+  while (num_planes < 3) {
     Eigen::Vector4d equation;
-    num_planes +=1;
+    num_planes += 1;
     // Segment the largest planar component from the remaining cloud
-    seg.setInputCloud (cloud_filtered);
-    seg.segment (*inliers, *coefficients);
-    if (inliers->indices.size () == 0)
-    {
-      std::cerr << "Could not estimate a planar model for the given dataset." << std::endl;
+    seg.setInputCloud(cloud_filtered);
+    seg.segment(*inliers, *coefficients);
+    if (inliers->indices.size() == 0) {
+      std::cerr << "Could not estimate a planar model for the given dataset."
+                << std::endl;
       break;
     }
 
     // Extract the inliers
-    extract.setInputCloud (cloud_filtered);
-    extract.setIndices (inliers);
-    extract.setNegative (false);
-    extract.filter (*cloud_p);
-    std::cerr << "PointCloud representing the planar component: " << cloud_p->width * cloud_p->height << " data points." << std::endl;
+    extract.setInputCloud(cloud_filtered);
+    extract.setIndices(inliers);
+    extract.setNegative(false);
+    extract.filter(*cloud_p);
+    std::cerr << "PointCloud representing the planar component: "
+              << cloud_p->width * cloud_p->height << " data points."
+              << std::endl;
     // Create the filtering object
-    extract.setNegative (true);
-    extract.filter (*cloud_f);
-    cloud_filtered.swap (cloud_f);
+    extract.setNegative(true);
+    extract.filter(*cloud_f);
+    cloud_filtered.swap(cloud_f);
     i++;
     PublishCloud(*cloud_p, cloud_test_pub);
     PublishCloud(*cloud_f, model_cloud_pub);
@@ -122,35 +123,32 @@ vector<pcl::PointCloud<pcl::PointXYZ> > getPlanes(
     equations.push_back(equation);
     output.push_back(*cloud_p);
   }
-  for(size_t i = 0; i < output.size(); i++) {
-      Eigen::Vector3d centroid;
-      pcl::PointCloud<pcl::PointXYZ> current_cloud = output[i];
-      for(size_t j = 0; j < output[i].size(); j++) {
-          pcl::PointXYZ point = current_cloud[j];
-          centroid[0] += point.x;
-          centroid[1] += point.y;
-          centroid[2] += point.z;
-      }
-      centroid = centroid / current_cloud.size();
-      centroids->push_back(centroid);
+  for (size_t i = 0; i < output.size(); i++) {
+    Eigen::Vector3d centroid;
+    pcl::PointCloud<pcl::PointXYZ> current_cloud = output[i];
+    for (size_t j = 0; j < output[i].size(); j++) {
+      pcl::PointXYZ point = current_cloud[j];
+      centroid[0] += point.x;
+      centroid[1] += point.y;
+      centroid[2] += point.z;
+    }
+    centroid = centroid / current_cloud.size();
+    centroids->push_back(centroid);
   }
-*normal_equations = equations;
-return output;
+  *normal_equations = equations;
+  return output;
 }
 // For checking if the mean has not changed
-bool DoubleEquals(double x, double y) {
-  return fabs(x-y) < .000005;
-}
+bool DoubleEquals(double x, double y) { return fabs(x - y) < .000005; }
 
-void TransformPointCloud_PCL(
-  pcl::PointCloud<pcl::PointXYZ>& cloud,
-  double transform[6]){
+void TransformPointCloud_PCL(pcl::PointCloud<pcl::PointXYZ> &cloud,
+                             double transform[6]) {
 
-  for(size_t i = 0; i < cloud.size(); ++i){
+  for (size_t i = 0; i < cloud.size(); ++i) {
     pcl::PointXYZ point = cloud[i];
 
-    Eigen::Matrix<double,3,1> point_matrix;
-    Eigen::Matrix<double,3,1> transformed_point_matrix;
+    Eigen::Matrix<double, 3, 1> point_matrix;
+    Eigen::Matrix<double, 3, 1> transformed_point_matrix;
     point_matrix << point.x, point.y, point.z;
     transformed_point_matrix = TransformPoint(point_matrix, transform);
     point.x = transformed_point_matrix[0];
@@ -160,15 +158,14 @@ void TransformPointCloud_PCL(
   }
 }
 
-void ComparePlanes(vector<pcl::PointCloud<pcl::PointXYZ> > k1_planes,
-    vector<pcl::PointCloud<pcl::PointXYZ> > transformed_planes,
-    vector<Eigen::Vector4d> normal_equations,
-    vector<Eigen::Vector4d> normal_equations_trans,
-    Eigen::Vector3d& rotation_correction,
-    Eigen::Vector3d& translation_correction) {
+void ComparePlanes(vector<pcl::PointCloud<pcl::PointXYZ>> k1_planes,
+                   vector<pcl::PointCloud<pcl::PointXYZ>> transformed_planes,
+                   vector<Eigen::Vector4d> normal_equations,
+                   vector<Eigen::Vector4d> normal_equations_trans,
+                   Eigen::Vector3d &rotation_correction,
+                   Eigen::Vector3d &translation_correction) {
 
-
-  for(size_t i = 0; i < k1_planes.size(); ++i) {
+  for (size_t i = 0; i < k1_planes.size(); ++i) {
     cout << i << endl;
     pcl::PointCloud<pcl::PointXYZ> plane1 = k1_planes[i];
     pcl::PointCloud<pcl::PointXYZ> plane2 = transformed_planes[i];
@@ -183,15 +180,15 @@ void ComparePlanes(vector<pcl::PointCloud<pcl::PointXYZ> > k1_planes,
     double py2 = 0;
     double pz2 = 0;
     pcl::Normal average2;
-    for(size_t j = 0; j < k1_planes[i].size(); ++j) {
-        px1 += plane1[j].x;
-        py1 += plane1[j].y;
-        pz1 += plane1[j].z;
+    for (size_t j = 0; j < k1_planes[i].size(); ++j) {
+      px1 += plane1[j].x;
+      py1 += plane1[j].y;
+      pz1 += plane1[j].z;
     }
-    for(size_t j = 0; j < transformed_planes[i].size(); ++j) {
-        px2 += plane2[j].x;
-        py2 += plane2[j].y;
-        pz2 += plane2[j].z;
+    for (size_t j = 0; j < transformed_planes[i].size(); ++j) {
+      px2 += plane2[j].x;
+      py2 += plane2[j].y;
+      pz2 += plane2[j].z;
     }
     px1 = px1 / plane1.size();
     py1 = py1 / plane1.size();
@@ -199,10 +196,10 @@ void ComparePlanes(vector<pcl::PointCloud<pcl::PointXYZ> > k1_planes,
     px2 = px2 / plane2.size();
     py2 = py2 / plane2.size();
     pz2 = pz2 / plane2.size();
-    Eigen::Matrix<double,3,1> p2_mat;
-    Eigen::Matrix<double,3,1> p1_mat;
-    Eigen::Matrix<double,3,1> norm_k;
-    Eigen::Matrix<double,3,1> norm_k1;
+    Eigen::Matrix<double, 3, 1> p2_mat;
+    Eigen::Matrix<double, 3, 1> p1_mat;
+    Eigen::Matrix<double, 3, 1> norm_k;
+    Eigen::Matrix<double, 3, 1> norm_k1;
     cout << "num normals: " << normal_equations.size() << endl;
     Eigen::Vector4d plane_equation_1 = normal_equations[i];
     Eigen::Vector4d plane_equation_2 = normal_equations_trans[i];
@@ -221,12 +218,16 @@ void ComparePlanes(vector<pcl::PointCloud<pcl::PointXYZ> > k1_planes,
     cout << "Offset Residual 1: " << (p1_mat - p2_mat).dot(norm_k) << endl;
     cout << "Offset Residual 2: " << (p2_mat - p1_mat).dot(norm_k1) << endl;
 
-    double dot = plane_equation_1[0]*plane_equation_2[0] +\
-        plane_equation_1[1]*plane_equation_2[1] +\
-        plane_equation_1[2]*plane_equation_2[2];
-        double lenSq1 = plane_equation_1[0]*plane_equation_1[0] + plane_equation_1[1]*plane_equation_1[1] + plane_equation_1[2]*plane_equation_1[2];
-        double lenSq2 =plane_equation_2[0]*plane_equation_2[0] + plane_equation_2[1]*plane_equation_2[1] + plane_equation_2[2]*plane_equation_2[2       ];
-    double angle = acos(dot/sqrt(lenSq1 * lenSq2));
+    double dot = plane_equation_1[0] * plane_equation_2[0] +
+                 plane_equation_1[1] * plane_equation_2[1] +
+                 plane_equation_1[2] * plane_equation_2[2];
+    double lenSq1 = plane_equation_1[0] * plane_equation_1[0] +
+                    plane_equation_1[1] * plane_equation_1[1] +
+                    plane_equation_1[2] * plane_equation_1[2];
+    double lenSq2 = plane_equation_2[0] * plane_equation_2[0] +
+                    plane_equation_2[1] * plane_equation_2[1] +
+                    plane_equation_2[2] * plane_equation_2[2];
+    double angle = acos(dot / sqrt(lenSq1 * lenSq2));
     Eigen::Vector3d axis = norm_k.cross(norm_k1);
     rotation_correction = axis * angle;
     cout << rotation_correction[0] << endl;
@@ -238,17 +239,17 @@ void ComparePlanes(vector<pcl::PointCloud<pcl::PointXYZ> > k1_planes,
   }
 }
 
-void CheckTransform(const string& bagfile, const string& transform_file) {
+void CheckTransform(const string &bagfile, const string &transform_file) {
   // Get Transform from file
   std::ifstream infile(transform_file.c_str());
   string transform_string;
   getline(infile, transform_string);
-  double* transform = new double[6];
+  double *transform = new double[6];
   istringstream ss(transform_string);
   int i = 0;
-  while(!ss.eof()) {
+  while (!ss.eof()) {
     string x;
-    getline( ss, x, ' ' );
+    getline(ss, x, ' ');
     transform[i] = atof(x.c_str());
     cout << transform[i] << "\t";
     ++i;
@@ -272,8 +273,8 @@ void CheckTransform(const string& bagfile, const string& transform_file) {
   rosbag::View::iterator end = view.end();
 
   // Buffers of clouds from both kinects to handle reading from a single file
-  std::deque<pcl::PointCloud<pcl::PointXYZ> > buffer_k1;
-  std::deque<pcl::PointCloud<pcl::PointXYZ> > buffer_k2;
+  std::deque<pcl::PointCloud<pcl::PointXYZ>> buffer_k1;
+  std::deque<pcl::PointCloud<pcl::PointXYZ>> buffer_k2;
   std::deque<double> times_k1;
   std::deque<double> times_k2;
 
@@ -293,7 +294,7 @@ void CheckTransform(const string& bagfile, const string& transform_file) {
   std_msgs::Header header;
   header.frame_id = "point_clouds";
   line_list.action = visualization_msgs::Marker::ADD;
-  //line_list.pose.orientation.w = 1.0;
+  // line_list.pose.orientation.w = 1.0;
   line_list.header.frame_id = "point_cloud";
 
   line_list.id = 0;
@@ -308,23 +309,26 @@ void CheckTransform(const string& bagfile, const string& transform_file) {
   z.z = .5;
   x.x = .5;
   y.y = .5;
-  bag_it = TimeAlignedClouds(bag_it, end,  &buffer_k1, &buffer_k2, &times_k1, 
-      &times_k2,
-      &keyframe_k1, &keyframe_k2, &timestamp_1, &timestamp_2);
+  bag_it = TimeAlignedClouds(bag_it, end, &buffer_k1, &buffer_k2, &times_k1,
+                             &times_k2, &keyframe_k1, &keyframe_k2,
+                             &timestamp_1, &timestamp_2);
 
-   // While there are still clouds in both datasets
+  // While there are still clouds in both datasets
   int count = 0;
   cout << "Starting Loop" << endl;
-  while(((buffer_k1.size() != 0 && buffer_k2.size() != 0 )|| (bag_it != view.end())) && count < 1) {  // Wrap the multiple cloud work inside this into a loop over the number of kinects
+  while (((buffer_k1.size() != 0 && buffer_k2.size() != 0) ||
+          (bag_it != view.end())) &&
+         count < 1) { // Wrap the multiple cloud work inside this into a loop
+                      // over the number of kinects
     count += 1;
     cout << count << endl;
     // Read in a new cloud from each dataset
     pcl::PointCloud<pcl::PointXYZ> cloud_k1;
     pcl::PointCloud<pcl::PointXYZ> cloud_k2;
 
-    bag_it = TimeAlignedClouds(bag_it, end, &buffer_k1, &buffer_k2, &times_k1, 
-        &times_k2,
-        &cloud_k1, &cloud_k2, &timestamp_1, &timestamp_2);
+    bag_it = TimeAlignedClouds(bag_it, end, &buffer_k1, &buffer_k2, &times_k1,
+                               &times_k2, &cloud_k1, &cloud_k2, &timestamp_1,
+                               &timestamp_2);
     pcl::PointCloud<pcl::PointXYZ> transformed_cloud = cloud_k2;
     WriteToObj("", out_name2, count, cloud_k1);
     WriteToObj("", out_name3, count, cloud_k2);
@@ -333,23 +337,25 @@ void CheckTransform(const string& bagfile, const string& transform_file) {
     vector<Eigen::Vector4d> normal_equations_trans;
     vector<Eigen::Vector3d> k1_centroids, k2_centroids;
     // Retrieve the planes from the clouds
-    vector<pcl::PointCloud<pcl::PointXYZ> > k1_planes = getPlanes(cloud_k1, &normal_equations, &k1_centroids);
-    vector<pcl::PointCloud<pcl::PointXYZ> > k2_planes = getPlanes(cloud_k2, &k2_normal_equations, &k2_centroids);
+    vector<pcl::PointCloud<pcl::PointXYZ>> k1_planes =
+        getPlanes(cloud_k1, &normal_equations, &k1_centroids);
+    vector<pcl::PointCloud<pcl::PointXYZ>> k2_planes =
+        getPlanes(cloud_k2, &k2_normal_equations, &k2_centroids);
 
     double transform_division = 100;
     // calculate partial transform
     transform[3] = transform[3] / transform_division;
     transform[4] = transform[4] / transform_division;
     transform[5] = transform[5] / transform_division;
-    Eigen::Matrix<double,3,1> axis(transform[0], transform[1], transform[2]);
+    Eigen::Matrix<double, 3, 1> axis(transform[0], transform[1], transform[2]);
     const double angle = axis.norm();
-    if(angle != 0) {
+    if (angle != 0) {
       axis = axis / angle;
     }
     transform[0] = axis[0] * (angle / transform_division);
     transform[1] = axis[1] * (angle / transform_division);
     transform[2] = axis[2] * (angle / transform_division);
-    for(int i = 0; i < transform_division; i++) {
+    for (int i = 0; i < transform_division; i++) {
       TransformPointCloud_PCL(transformed_cloud, transform);
       //       TransformPointCloud_PCL(transformed_cloud, rotation);
 
@@ -375,25 +381,23 @@ void CheckTransform(const string& bagfile, const string& transform_file) {
 }
 
 int main(int argc, char **argv) {
-  signal(SIGINT,HandleStop);
-  signal(SIGALRM,HandleStop);
+  signal(SIGINT, HandleStop);
+  signal(SIGALRM, HandleStop);
 
-  char* bagFile = (char*)"pair_upright.bag";
-  char* transform_file = (char*)"";
+  char *bagFile = (char *)"pair_upright.bag";
+  char *transform_file = (char *)"";
   // Parse arguments.
   static struct poptOption options[] = {
-    { "use-bag-file" , 'B', POPT_ARG_STRING, &bagFile ,0, "Process bag file" ,
-        "STR" },
-    { "transform-file" , 'T', POPT_ARG_STRING, &transform_file ,0, "Transform File" ,
-        "STR" },
-    POPT_AUTOHELP
-    { NULL, 0, 0, NULL, 0, NULL, NULL }
-  };
+      {"use-bag-file", 'B', POPT_ARG_STRING, &bagFile, 0, "Process bag file",
+       "STR"},
+      {"transform-file", 'T', POPT_ARG_STRING, &transform_file, 0,
+       "Transform File", "STR"},
+      POPT_AUTOHELP{NULL, 0, 0, NULL, 0, NULL, NULL}};
 
   // parse options
-  POpt popt(NULL,argc,(const char**)argv,options,0);
+  POpt popt(NULL, argc, (const char **)argv, options, 0);
   int c;
-  while((c = popt.getNextOpt()) >= 0) {
+  while ((c = popt.getNextOpt()) >= 0) {
   }
   // Print option values
   cout << "Using bagfile: " << bagFile << endl;
@@ -402,17 +406,17 @@ int main(int argc, char **argv) {
   ros::init(argc, argv, "pose_estimation", ros::init_options::NoSigintHandler);
   ros::NodeHandle n;
   //----------  Setup Visualization ----------
-  cloud_pub = n.advertise<sensor_msgs::PointCloud2> ("cloud_pub_1", 1);
-  cloud_pub_2 = n.advertise<sensor_msgs::PointCloud2> ("cloud_pub_2", 1);
-  cloud_pub_3 = n.advertise<sensor_msgs::PointCloud2> ("cloud_pub_3", 1);
-  cloud_pub_4 = n.advertise<sensor_msgs::PointCloud2> ("cloud_pub_4", 1);
-  cloud_test_pub = n.advertise<sensor_msgs::PointCloud2> ("cloud_pub_5", 1);
-  model_cloud_pub = n.advertise<sensor_msgs::PointCloud2> ("cloud_pub_6", 1);
-  bmodel_cloud_pub = n.advertise<sensor_msgs::PointCloud2> ("cloud_pub_7", 1);
+  cloud_pub = n.advertise<sensor_msgs::PointCloud2>("cloud_pub_1", 1);
+  cloud_pub_2 = n.advertise<sensor_msgs::PointCloud2>("cloud_pub_2", 1);
+  cloud_pub_3 = n.advertise<sensor_msgs::PointCloud2>("cloud_pub_3", 1);
+  cloud_pub_4 = n.advertise<sensor_msgs::PointCloud2>("cloud_pub_4", 1);
+  cloud_test_pub = n.advertise<sensor_msgs::PointCloud2>("cloud_pub_5", 1);
+  model_cloud_pub = n.advertise<sensor_msgs::PointCloud2>("cloud_pub_6", 1);
+  bmodel_cloud_pub = n.advertise<sensor_msgs::PointCloud2>("cloud_pub_7", 1);
   marker_pub =
-  n.advertise<visualization_msgs::Marker>("visualization_marker", 10);
-  markerArray_pub =
-  n.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 10);
+      n.advertise<visualization_msgs::Marker>("visualization_marker", 10);
+  markerArray_pub = n.advertise<visualization_msgs::MarkerArray>(
+      "visualization_marker_array", 10);
 
   CheckTransform(bagFile, transform_file);
 
