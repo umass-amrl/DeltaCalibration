@@ -71,20 +71,20 @@ size(Temp)
 size(Temp2)
 size(V1)
 size(V2)
-kinectData = struct('folder', '', 'files', [], 'time', time, 'type', 'kinect', 'T_Skm1_Sk', Temp(:,1:6), 'T_S1_Sk', T1, 'T_Var_Skm1_Sk', V1, 'T_Var_S1_Sk', V2);
-save('multi-array-calib/storedTforms/GenKinectData.mat', 'kinectData');
-odomData = struct('folder', '', 'files', [], 'time', time, 'type', 'nav', 'T_Skm1_Sk', Temp2(:,1:6), 'T_S1_Sk', T2, 'T_Var_Skm1_Sk', V2, 'T_Var_S1_Sk', V2);
-save('multi-array-calib/storedTforms/GenNavData.mat', 'odomData');
+% kinectData = struct('folder', '', 'files', [], 'time', time, 'type', 'kinect', 'T_Skm1_Sk', Temp(:,1:6), 'T_S1_Sk', T1, 'T_Var_Skm1_Sk', V1, 'T_Var_S1_Sk', V2);
+% save('multi-array-calib/storedTforms/GenKinectData.mat', 'kinectData');
+% odomData = struct('folder', '', 'files', [], 'time', time, 'type', 'nav', 'T_Skm1_Sk', Temp2(:,1:6), 'T_S1_Sk', T2, 'T_Var_Skm1_Sk', V2, 'T_Var_S1_Sk', V2);
+% save('multi-array-calib/storedTforms/GenNavData.mat', 'odomData');
 dlmwrite('generated_deltas_rot.txt', C0, ' ');
 dlmwrite('generated_deltas_trans.txt', C1, ' ');
 dlmwrite('generated_uncertaintiest.txt', Ut, ' ');
 dlmwrite('generated_uncertaintiesr.txt', Ur, ' ');
 dlmwrite('T_generated_uncertaintiest.txt', Ut, ' ');
 dlmwrite('T_generated_uncertaintiesr.txt', Ur, ' ');
-B_cal = Test3KinectNav();
+% B_cal = Test3KinectNav();
 
-A_multiCal = [B_cal.rot B_cal.tran];
-A_multiCal = A_multiCal(2,:)
+% A_multiCal = [B_cal.rot B_cal.tran];
+% A_multiCal = A_multiCal(2,:)
 !../../../bin/test_turtlebot_calibrate
 A_cal = dlmread(strcat('calibration', '.pose'), '\t');
 
@@ -93,11 +93,11 @@ q = aa2quat(A');
 error_aa = rotm2aa(inv(aa2rotm(A(1:3)')) * aa2rotm(A_cal(1:3)'));
 r_err = norm(error_aa) / pi * 180
 t_err = norm(A(4:6) - A_cal(4:6))
-t_m_err = norm(A(4:6) - A_multiCal(4:6))
-error_aa_multical = rotm2aa(inv(aa2rotm(A(1:3)')) * aa2rotm(A_multiCal(1:3)'));
-r_m_err = norm(error_aa_multical) / pi * 180
+% t_m_err = norm(A(4:6) - A_multiCal(4:6))
+% error_aa_multical = rotm2aa(inv(aa2rotm(A(1:3)')) * aa2rotm(A_multiCal(1:3)'));
+% r_m_err = norm(error_aa_multical) / pi * 180
 A_cal
 A
-A_multiCal
+% A_multiCal
 % Compute translation error
 
