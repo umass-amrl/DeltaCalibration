@@ -2,8 +2,6 @@
 function [t_err, r_err, t_m_err, r_m_err] = genTestPartialCal(N,angle,noise)
 clc;
 A = RandomTransform6D(3.14159, .5)';
-% A = [0 0 1.5 0 0 0 0 0];
-%N = 10;
 max_delta_angle = angle / 180 * pi;
 max_delta_translation = 0.2;
 noise_angular = (1.0 *noise) / 180 * pi;
@@ -58,16 +56,16 @@ for i=1:N
   a1x_uy = StripRotation(a1x,ux);
   a1y_ux = StripRotation(a1y, uy);
   a1y_uy = StripRotation(a1y, ux);
-
+% 
   a1x_ux = StripTranslation(a1x_ux,ux);
   a1x_uy = StripTranslation(a1x_uy,uy);
   a1y_ux = StripTranslation(a1y_ux, ux);
   a1y_uy = StripTranslation(a1y_uy, uy);
 
-%   A1 = [A1; a1x];
-%   A1 = [A1; a1y];
-%   A1 = [A1; a1x];
-%   A1 = [A1; a1y];
+%   A1 = [A1; a1x 0 0];
+%   A1 = [A1; a1y 0 0];
+%   A1 = [A1; a1x 0 0];
+%   A1 = [A1; a1y 0 0];
 %
   A1 = [A1; a1x_ux];
   A1 = [A1; a1y_ux];
@@ -99,6 +97,10 @@ for i=1:N
 %   U1t = [U1t ; u0];
 %   U1t = [U1t ; u0];
 %   U1t = [U1t ; u0];
+%   U1r = [U1r ; u0];
+%   U1r = [U1r ; u0];
+%   U1r = [U1r ; u0];
+%   U1r = [U1r ; u0];
 %
   U2t = [U2t ; u0];
   U2t = [U2t ; u0];

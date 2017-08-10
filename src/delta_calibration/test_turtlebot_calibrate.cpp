@@ -77,15 +77,15 @@ int main(int argc, char **argv) {
   transform[5] = 0;
 
   double *RMSE = 0;
-  //   PartialCalibrateR(deltas_1, uncertaintyR_1, uncertaintyT_1, deltas_2,
-  //   uncertaintyR_2, uncertaintyT_2,transform, RMSE);
+//     PartialCalibrateR(deltas_1, uncertaintyR_1, uncertaintyT_1, deltas_2,
+//     uncertaintyR_2, uncertaintyT_2,transform, RMSE);
   //   cout << "calibrated" << endl;
   PartialCalibrateRwT(deltas_1, uncertaintyR_1, uncertaintyT_1, deltas_2,
                       uncertaintyR_2, uncertaintyT_2, deltasT_1,
                       TuncertaintyR_1, TuncertaintyT_1, deltasT_2,
                       TuncertaintyR_2, TuncertaintyT_2, transform, RMSE);
-  //   PartialCalibrateT(deltas_1, uncertaintyR_1, uncertaintyT_1, deltas_2,
-  //   uncertaintyR_2, uncertaintyT_2,transform, RMSE);
+//     PartialCalibrateT(deltas_1, uncertaintyR_1, uncertaintyT_1, deltas_2,
+//     uncertaintyR_2, uncertaintyT_2,transform, RMSE);
   cout << "calibrated2" << endl;
   PrintPose(transform);
   ofstream output("calibration.pose");

@@ -6,10 +6,24 @@ namespace delta_calc {
 
 void HandleStop(int i);
 
-void DeltaCalculationBrass(std::string bag_name,
-                           std::vector<ros::Publisher> publishers,
-                           const int degree, const int kMaxClouds);
+// Calculates Delta-Transforms using a kinect and odometry data, where the
+// kinect data is recorded using openni (as in the turtlebot setup).
+void DeltaCalculationOpenniOdom(const std::string& bag_name,
+                                std::vector<ros::Publisher> publishers,
+                                const int& degree,
+                                const int& kMaxClouds,
+                                const bool& uncertainty);
 
+// Calculates Delta-Transforms using two kinects, where the
+// kinect data is recorded using openni (as in the turtlebot setup).
+void DeltaCalculationOpenni(const string& bag_name,
+                            vector<ros::Publisher> publishers,
+                            const int& degree,
+                            const int& kMaxClouds,
+                            const bool& uncertainty);
+
+// Calculates Delta-Transforms using two kinects, where the
+// kinect data is recorded using the Cobots recording method.
 void DeltaCalculation(std::string bag_name,
                       std::vector<ros::Publisher> publishers, const int degree,
                       const int kMaxClouds);

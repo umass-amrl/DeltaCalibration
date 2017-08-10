@@ -2213,7 +2213,7 @@ rosbag::View::iterator TimeAlignedCloudsSlamBag(
 
 bool CheckChangeVel(double *pose, const int degree,
                     const vector<double> &velocity_list) {
-  double trans_eps = .05;
+  const double trans_eps = .05;
   Eigen::Matrix<double, 3, 1> axis(pose[0], pose[1], pose[2]);
   Eigen::Matrix<double, 3, 1> trans(pose[3], pose[4], pose[5]);
   const double angle = axis.norm();
@@ -2230,7 +2230,6 @@ bool CheckChangeVel(double *pose, const int degree,
   velocity = velocity / velocity_list.size();
   fprintf(stdout, "Velocity: %f\n", velocity);
   if (degree > 0) {
-    cout << "Degree" << endl;
     if (abs(velocity) < 2.5) {
       if ((angle_degree > degree)) {
         cout << "TRUE" << endl;
@@ -2240,8 +2239,6 @@ bool CheckChangeVel(double *pose, const int degree,
       }
     }
   } else {
-    cout << "not degree" << endl;
-    cout << "Translation: " << norm << endl;
     if ((angle_degree > degree) && norm > trans_eps) {
       return true;
     } else {
@@ -2360,14 +2357,12 @@ bool CheckChangeOdom(double *pose, double *previous_pose,
   const double angle_previous = axis_previous.norm();
   double angle_degree = (180 / 3.14) * angle;
   // PrintPose(pose);
-  cout << "angle degrees: " << (180 / 3.14) * angle << endl;
+//   cout << "angle degrees: " << (180 / 3.14) * angle << endl;
   // cout << "angle: " << angle << endl;
   double velocity;
   velocity = angle_previous / (timestamp_1 - timestamp_2);
-  cout << "Velocity: " << velocity << endl;
   if (abs(velocity) < .05) {
     if ((angle_degree > degree)) {
-      cout << "TRUE" << endl;
       return true;
     } else {
       return false;

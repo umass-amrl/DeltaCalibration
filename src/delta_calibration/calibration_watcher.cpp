@@ -838,10 +838,16 @@ void DepthCb(sensor_msgs::PointCloud2 msg) {
       publishers.push_back(cloudx_pub_3);
       publishers.push_back(cloudx_pub_3);
       cout << "Calculating Deltas" << endl;
-      delta_calc::DeltaCalculationBrass("recorded_data_trans", publishers, 0,
-                                        INT_MAX);
-      delta_calc::DeltaCalculationBrass("recorded_data_rot", publishers, 1,
-                                        INT_MAX);
+      delta_calc::DeltaCalculationOpenniOdom("recorded_data_trans",
+                                             publishers,
+                                             0,
+                                             INT_MAX,
+                                             true);
+      delta_calc::DeltaCalculationOpenniOdom("recorded_data_rot",
+                                             publishers,
+                                             1,
+                                             INT_MAX,
+                                             true);
       partial_calibrate::turtlebot_calibrate("recorded_data");
     }
   } else if (mode == record_rot || mode == record_trans) {

@@ -52,26 +52,26 @@ end
 C0 = [A1 A2]
 A1
 A2
-kinectData = struct('folder', '', 'files', [], 'time', time, 'type', 'kinect', 'T_Skm1_Sk', A1(:,1:6), 'T_S1_Sk', T1, 'T_Var_Skm1_Sk', V1, 'T_Var_S1_Sk', V2);
-save('multi-array-calib/storedTforms/GenKinectData.mat', 'kinectData');
-odomData = struct('folder', '', 'files', [], 'time', time, 'type', 'nav', 'T_Skm1_Sk', A2(:,1:6), 'T_S1_Sk', T2, 'T_Var_Skm1_Sk', V2, 'T_Var_S1_Sk', V2);
-save('multi-array-calib/storedTforms/GenNavData.mat', 'odomData');
+% kinectData = struct('folder', '', 'files', [], 'time', time, 'type', 'kinect', 'T_Skm1_Sk', A1(:,1:6), 'T_S1_Sk', T1, 'T_Var_Skm1_Sk', V1, 'T_Var_S1_Sk', V2);
+% save('multi-array-calib/storedTforms/GenKinectData.mat', 'kinectData');
+% odomData = struct('folder', '', 'files', [], 'time', time, 'type', 'nav', 'T_Skm1_Sk', A2(:,1:6), 'T_S1_Sk', T2, 'T_Var_Skm1_Sk', V2, 'T_Var_S1_Sk', V2);
+% save('multi-array-calib/storedTforms/GenNavData.mat', 'odomData');
 size(C0)
 dlmwrite('generated_deltas.txt', C0, ' ');
 
 A
-B_cal = Test3KinectNav();
+% B_cal = Test3KinectNav();
 
 A_cal = calibrate_data(C0);
-A_multiCal = [B_cal.rot B_cal.tran];
+% A_multiCal = [B_cal.rot B_cal.tran];
 A_cal
 A
-A_multiCal = A_multiCal(2,:)
+% A_multiCal = A_multiCal(2,:)
 % Compute angular error
 error_aa = rotm2aa(inv(aa2rotm(A(1:3)')) * aa2rotm(A_cal(1:3)'));
 r_err = norm(error_aa) / pi * 180
-error_aa_multical = rotm2aa(inv(aa2rotm(A(1:3)')) * aa2rotm(A_multiCal(1:3)'));
-r_m_err = norm(error_aa_multical) / pi * 180
+% error_aa_multical = rotm2aa(inv(aa2rotm(A(1:3)')) * aa2rotm(A_multiCal(1:3)'));
+% r_m_err = norm(error_aa_multical) / pi * 180
 % Compute translation error
 t_err = norm(A(4:6) - A_cal(4:6))
-t_m_err = norm(A(4:6) - A_multiCal(4:6))
+% t_m_err = norm(A(4:6) - A_multiCal(4:6))

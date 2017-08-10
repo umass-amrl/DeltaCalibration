@@ -13,7 +13,7 @@ set(CMAKE_AUTOMOC ON)
 #     ${OpenCV_LIBRARIES})
 # TARGET_LINK_LIBRARIES(${target}
 #     ceres
-#     shared_libraries 
+#     shared_libraries
 #     fspf_library
 #     ${OpenCV_LIBRARIES} ${libs})
 
@@ -32,7 +32,7 @@ ADD_DEPENDENCIES(${target}
     ${OpenCV_LIBRARIES})
 TARGET_LINK_LIBRARIES(${target}
     ceres
-    shared_libraries 
+    shared_libraries
     fspf_library
     ${OpenCV_LIBRARIES} ${libs})
 
@@ -51,10 +51,10 @@ ADD_DEPENDENCIES(${target}
     ${OpenCV_LIBRARIES})
 TARGET_LINK_LIBRARIES(${target}
     ceres
-    shared_libraries 
+    shared_libraries
     fspf_library
     ${OpenCV_LIBRARIES} ${libs})
-    
+
 SET(target partial_calibrate)
 ROSBUILD_ADD_EXECUTABLE(${target}
     test_calibrate.cpp
@@ -69,10 +69,10 @@ ADD_DEPENDENCIES(${target}
     ${OpenCV_LIBRARIES})
 TARGET_LINK_LIBRARIES(${target}
     ceres
-    shared_libraries 
+    shared_libraries
     fspf_library
     ${OpenCV_LIBRARIES} ${libs})
-    
+
 SET(target test_turtlebot_calibrate)
 ROSBUILD_ADD_EXECUTABLE(${target}
     test_turtlebot_calibrate.cpp
@@ -87,7 +87,25 @@ ADD_DEPENDENCIES(${target}
     ${OpenCV_LIBRARIES})
 TARGET_LINK_LIBRARIES(${target}
     ceres
-    shared_libraries 
+    shared_libraries
+    fspf_library
+    ${OpenCV_LIBRARIES} ${libs})
+
+SET(target delta_calibrate)
+ROSBUILD_ADD_EXECUTABLE(${target}
+    delta_calibrate.cpp
+    icp.cpp
+    partial_calibrate.cpp
+    ../perception_tools/kdtree.cpp)
+ADD_DEPENDENCIES(${target}
+    ceres
+    shared_libraries
+    fspf_library
+    perception_library
+    ${OpenCV_LIBRARIES})
+TARGET_LINK_LIBRARIES(${target}
+    ceres
+    shared_libraries
     fspf_library
     ${OpenCV_LIBRARIES} ${libs})
 # SET(target test_normals)
@@ -103,10 +121,10 @@ TARGET_LINK_LIBRARIES(${target}
 #     ${OpenCV_LIBRARIES})
 # TARGET_LINK_LIBRARIES(${target}
 #     ceres
-#     shared_libraries 
+#     shared_libraries
 #     fspf_library
 #     ${OpenCV_LIBRARIES} ${libs})
-#     
+#
 # SET(target visualizes_poses)
 # ROSBUILD_ADD_EXECUTABLE(${target}
 #     visualize_poses.cpp
@@ -120,10 +138,10 @@ TARGET_LINK_LIBRARIES(${target}
 #     ${OpenCV_LIBRARIES})
 # TARGET_LINK_LIBRARIES(${target}
 #     ceres
-#     shared_libraries 
+#     shared_libraries
 #     fspf_library
 #     ${OpenCV_LIBRARIES} ${libs})
-#     
+#
 #  SET(target find_z)
 # ROSBUILD_ADD_EXECUTABLE(${target}
 #     find_z.cpp
@@ -137,10 +155,10 @@ TARGET_LINK_LIBRARIES(${target}
 #     ${OpenCV_LIBRARIES})
 # TARGET_LINK_LIBRARIES(${target}
 #     ceres
-#     shared_libraries 
+#     shared_libraries
 #     fspf_library
 #     ${OpenCV_LIBRARIES} ${libs})
-#     
+#
 # SET(target check_transform)
 # ROSBUILD_ADD_EXECUTABLE(${target} check_transform.cpp
 #                                   icp.cpp
@@ -152,6 +170,6 @@ TARGET_LINK_LIBRARIES(${target}
 #     ${OpenCV_LIBRARIES})
 # TARGET_LINK_LIBRARIES(${target}
 #     ceres
-#     shared_libraries 
+#     shared_libraries
 #     fspf_library
 #     ${OpenCV_LIBRARIES} ${libs})

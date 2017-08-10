@@ -22,12 +22,17 @@ int main(int argc, char **argv) {
   //   bool normal_mode = false;
   // Parse arguments.
   static struct poptOption options[] = {
-      {"max-clouds", 'k', POPT_ARG_INT, &max_clouds, 0, "Max Clouds", "NUM"},
-      {"delta", 'd', POPT_ARG_INT, &max_delta_degrees, 0, "Angular Change",
+      {"max-clouds", 'k', POPT_ARG_INT, &max_clouds, 0,
+        "Max # of clouds to use from file.", "NUM"},
+      {"delta", 'd', POPT_ARG_INT, &max_delta_degrees, 0,
+        "Minimum rotation in degrees to accept a Delta-Transform. If 0 uses a \
+        default translation threshold only. ",
        "NUM"},
-      {"bag-file", 'B', POPT_ARG_STRING, &bag_file, 0, "Process bag file",
+      {"bag-file", 'B', POPT_ARG_STRING, &bag_file, 0,
+        "Bag File to use for extracting deltas.",
        "STR"},
-      {"mode-mode", 'M', POPT_ARG_NONE, &mode, 0, "Selec input mode", "NONE"},
+      {"turtlebot_mode", 't', POPT_ARG_NONE, &mode, 0,
+        "Extract Delta-Transforms in TurtlebotMode", "NONE"},
       POPT_AUTOHELP{NULL, 0, 0, NULL, 0, NULL, NULL}};
 
   // parse options
@@ -59,12 +64,18 @@ int main(int argc, char **argv) {
       "visualization_marker_array", 10);
 
   if (mode == 0) {
-    DeltaCalculation(bag_file, publishers, max_delta_degrees, max_clouds);
+    DeltaCalculationOpenni(bag_file,
+                           publishers,
+                           max_delta_degrees,
+                           max_clouds,
+                           false);
   } else if (mode == 1) {
-    cout << "Brass Delta Calculation" << endl;
-    DeltaCalculationBrass(bag_file, publishers, max_delta_degrees, max_clouds);
-  } else {
-    DeltaCalculationSingle(bag_file, publishers, max_delta_degrees, max_clouds);
+    cout << "Turtlebot Delta Calculation" << endl;
+    DeltaCalculationOpenniOdom(bag_file,
+                               publishers,
+                               max_delta_degrees,
+                               max_clouds,
+                               true);
   }
   return 0;
 }
