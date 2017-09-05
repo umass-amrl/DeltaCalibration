@@ -1,3 +1,19 @@
+//========================================================================
+//  This software is free: you can redistribute it and/or modify
+//  it under the terms of the GNU Lesser General Public License Version 3,
+//  as published by the Free Software Foundation.
+//
+//  This software is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU Lesser General Public License for more details.
+//
+//  You should have received a copy of the GNU Lesser General Public License
+//  Version 3 in the file COPYING that came with this distribution.
+//  If not, see <http://www.gnu.org/licenses/>.
+//========================================================================
+//========================================================================
+
 //----------- INCLUDES
 #include "delta_calibration/icp.h"
 #include "delta_calibration/delta_calc.h"
@@ -1665,7 +1681,7 @@ void DeltaCalculationOpenniOdom(const string& bag_name,
         WriteUncertaintyFile(empty, uncertaintyR_file);
         uncertaintyR_file << endl;
         uncertaintyT_file << endl;
-        
+
         // Remove the uncertain portions of the transform from the transform.
         StripUncertainty(uncertainty_t, uncertainty_r,
           variables->k1_combined_transform);
