@@ -35,6 +35,7 @@ int main(int argc, char **argv) {
   int max_delta_degrees = 0;
   char *bag_file = (char *)"pair_upright.bag";
   int mode = 0;
+  int uncertainty = 0;
   //   bool normal_mode = false;
   // Parse arguments.
   static struct poptOption options[] = {
@@ -49,6 +50,8 @@ int main(int argc, char **argv) {
        "STR"},
       {"turtlebot_mode", 't', POPT_ARG_NONE, &mode, 0,
         "Extract Delta-Transforms in TurtlebotMode", "NONE"},
+      {"uncertainyt_calc", 'u', POPT_ARG_NONE, &uncertainty, 0,
+        "Extract uncertainty along with deltas", "NONE"},
       POPT_AUTOHELP{NULL, 0, 0, NULL, 0, NULL, NULL}};
 
   // parse options
@@ -76,22 +79,24 @@ int main(int argc, char **argv) {
   publishers.push_back(cloudx_pub_4);
   xmarker_pub =
       n.advertise<visualization_msgs::Marker>("visualization_marker", 10);
+  publishers.push_back(xmarker_pub);
   xmarkerArray_pub = n.advertise<visualization_msgs::MarkerArray>(
       "visualization_marker_array", 10);
+  publishers.push_back(xmarkerArray_pub);
 
   if (mode == 0) {
     DeltaCalculationOpenni(bag_file,
                            publishers,
                            max_delta_degrees,
                            max_clouds,
-                           false);
+                           uncertainty);
   } else if (mode == 1) {
     cout << "Turtlebot Delta Calculation" << endl;
     DeltaCalculationOpenniOdom(bag_file,
                                publishers,
                                max_delta_degrees,
                                max_clouds,
-                               true);
+                               uncertainty);
   }
   return 0;
 }

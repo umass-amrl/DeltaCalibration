@@ -25,8 +25,8 @@ namespace icp {
 
 bool first_nn = true;
 int count = 0;
-const float nn_dist = .05;
-float neighbor_dist = .05;
+const float nn_dist = .1;
+float neighbor_dist = .1;
 vector<int> x_pos;
 vector<int> y_pos;
 
@@ -885,10 +885,8 @@ void PlaneCorrections(const pcl::PointCloud<pcl::PointXYZ> &cloud_1,
     options.linear_solver_type = ceres::SPARSE_SCHUR;
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem, &summary);
-    // std::cout << summary.FullReport() << "\n";
     rmse =
         sqrt(summary.final_cost / static_cast<double>(summary.num_residuals));
-    //         fprintf(stdout, "RMSE: %f \n", rmse);
     ceres::Problem::EvaluateOptions evalOptions =
         ceres::Problem::EvaluateOptions();
   }
@@ -991,12 +989,6 @@ double ResidualDist(const pcl::PointCloud<pcl::PointXYZ> &k_cloud,
   //----------  Find Nearest Neighbors  ----------
   vector<int> nearest_neigbors;
   vector<int> start_points;
-  // mean += KdTreeNN_normal(base_cloud, transformed_cloud, normals[k],
-  //     normals[l],
-  // nearest_neigbors, start_points);
-  // Reverse order nearest neighbor to make sure we're transforming in the right
-  // direction
-  // cout << "Finding Neighbors" << endl;
   vector<Eigen::Vector2d> image_coords_1;
   vector<Eigen::Vector2d> image_coords_2;
   KdTreeNN(nn_dist, k_cloud, l_cloud, k_normal, l_normal, image_coords_1,
@@ -1008,16 +1000,11 @@ double ResidualDist(const pcl::PointCloud<pcl::PointXYZ> &k_cloud,
   // being calculated
   BuildProblem(k_cloud, l_cloud, nearest_neigbors, start_points, pose, k_normal,
                l_normal, &problem);
-  // fprintf(stdout, "problem built\n");
   //----------  Ceres Solve  ----------
   ceres::Solver::Options options;
   options.num_threads = 12;
   options.num_linear_solver_threads = 12;
   options.linear_solver_type = ceres::ITERATIVE_SCHUR;
-  // options.minimizer_progress_to_stdout = true;
-  // ceres::Solver::Summary summary;
-  // ceres::Solve(options, &problem, &summary);
-  // std::cout << summary.FullReport() << "\n";
   vector<double> residuals;
   residuals.clear();
   ceres::Problem::EvaluateOptions evalOptions =
@@ -1030,11 +1017,8 @@ double ResidualDist(const pcl::PointCloud<pcl::PointXYZ> &k_cloud,
   double rmse = 0.0;
   for (size_t i = 0; i < residuals.size(); ++i) {
     rmse += sq(residuals[i]);
-    //     cout <<  sq(residuals[i]) << endl;
   }
-  //   cout << "RMSE: " << rmse << endl;
   rmse = sqrt(rmse / static_cast<double>(residuals.size()));
-  // cout << "RMSE: " << rmse << endl;
   return rmse;
 }
 
@@ -1142,11 +1126,6 @@ void VisualizeDepthImage(const pcl::PointCloud<pcl::PointXYZ> &cloud,
     Eigen::Vector3d image_point = PointToDepthImage(point);
     //     int ind = image_point[0]*width + image_point[1];
     int ind2 = width * height - i - 1 + 0 * width * height;
-    // fprintf(stdout, "INd: %d \n", ind);
-    //     double col = image_point[0];
-    //     double row = image_point[1];
-    //     int col = ind % width;
-    //     int row = ind / width - col;
     if (ind2 < 640 * 480) {
       //       if(col  < 0 ) {
       //         image[ind2] = 0;
@@ -1439,13 +1418,10 @@ Eigen::MatrixXd CalculateJTJ(const ceres::CRSMatrix &jacobian) {
     for (size_t l = row; l < nextRow; ++l) {
       int column = jacobian.cols[l];
       double value = jacobian.values[l];
-      // std::cout << row << " " << column << " " << value << std::endl;
       denseJacobian(k, column) = value;
     }
   }
 
-  // denseJacobian = Eigen::MatrixXd(jacobianMatrix);
-  // Calculate j.transpose j
   Eigen::MatrixXd jTj = denseJacobian.transpose() * denseJacobian;
 
   return jTj;
@@ -1461,7 +1437,6 @@ Eigen::MatrixXd CalculateCovariance(const Eigen::MatrixXd &mat) {
 void VisualizeCovariance(const int num, const string covarianceFolder,
                          const string bagfile,
                          const ceres::CRSMatrix &jacobian) {
-  // cout << "vizualizing covariance" << endl;
   std::stringstream out;
 
   mkdir(covarianceFolder.c_str(), 0777);
@@ -1472,17 +1447,14 @@ void VisualizeCovariance(const int num, const string covarianceFolder,
   ofstream file(filename.c_str());
   // Calculate the jtj and the covariance matrix
   Eigen::MatrixXd jtj = CalculateJTJ(jacobian);
-  // cout << "Information Size:: " << jtj.size() << endl;
   // Translation Portion
   Eigen::MatrixXd translation = jtj.inverse().block(3, 3, 3, 3);
   Eigen::MatrixXd covarianceMat = translation;
-  // cout << jtj << endl;
   file << covarianceMat << endl;
   // Solve to retrieve eigenvectors/values
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigenSolver(covarianceMat);
   Eigen::MatrixXd eigenvalues = eigenSolver.eigenvalues();
   Eigen::MatrixXd eigenvectors = eigenSolver.eigenvectors();
-  // cout << "Eigen values: \n" << eigenvalues << endl;
   //   //Calculate Rotation Matrix and convert to quaternion
   Eigen::Matrix3d rotationMat = eigenvectors;
 
@@ -1571,7 +1543,6 @@ GetNormals(const pcl::PointCloud<pcl::PointXYZ> &cloud) {
   ne.setRadiusSearch(0.03);
 
   // Compute the features
-  //   cout << "Computing normal" << endl;
   ne.compute(*cloud_normals);
 
   return *cloud_normals;
@@ -1592,42 +1563,26 @@ void ConstructICP_problem(const vector<ros::Publisher> &publishers,
   pcl::PointCloud<pcl::PointXYZ> transformed_cloud = cloud_2;
 
   // Shifts cloud by calculated transform
-  TransformPointCloud(&transformed_cloud, transform); /*
-   PublishCloud(cloud_1, publishers[0]);
-   PublishCloud(transformed_cloud, publishers[1]);*/
-  // PublishCloud(cloud_2, cloud_pub_3);
-  //----------  Visualize it ----------
+  TransformPointCloud(&transformed_cloud, transform);
 
-  //----------  Find Nearest Neighbors  ----------
-  // vector<int> nearest_neighbors(transformed_cloud.points.size());
-  // vector<float> squared_distances(transformed_cloud.points.size(),100);
   //----------  Find Nearest Neighbors  ----------
   vector<int> nearest_neigbors;
   vector<int> start_points;
-  // mean += KdTreeNN_normal(base_cloud, transformed_cloud, normals[k],
-  // normals[l],
-  // nearest_neigbors, start_points);
   // Reverse order nearest neighbor to make sure we're transforming in the right
   // direction
-  // cout << "Finding Neighbors" << endl;
   KdTreeNN(nn_dist, cloud_1, transformed_cloud, normal_1, normal_2,
            image_coords_1, image_coords_2, nearest_neigbors, start_points);
-  // VisualizeNN(cloud_1, cloud_2, nearest_neigbors, start_points,
-  // publishers[4]);
-
-  // ROS_INFO("Mean = %f", mean);
 
   //----------  Visualize NN ----------
-  // VisualizeNN(cloud_1,
-  //              transformed_cloud,
-  //              nearest_neigbors,
-  //              start_points);
-  // sleep(1);
+//   VisualizeNN(cloud_1,
+//                transformed_cloud,
+//                nearest_neigbors,
+//                start_points);
+//   sleep(1);
 
   //----------  Compute Pose with ceres-solver  ----------
   // Add for each pair of nearest neighbors
   int pair_count = 0;
-  // cout << "Building Problem" << endl;
   for (size_t i = 0; i < start_points.size(); i++) {
     pcl::PointXYZ k1_point, base_point;
     // Use the original cloud, not the transformed cloud
@@ -1698,15 +1653,10 @@ void ConstructICPKnown(const vector<ros::Publisher> &publishers,
   TransformPointCloud(&transformed_cloud, transform);
   PublishCloud(cloud_1, publishers[0]);
   PublishCloud(transformed_cloud, publishers[1]);
-  // PublishCloud(cloud_2, cloud_pub_3);
-  //----------  Visualize it ----------
-
-  // sleep(1);
 
   //----------  Compute Pose with ceres-solver  ----------
   // Add for each pair of nearest neighbors
   int pair_count = 0;
-  // cout << "Building Problem" << endl;
   for (size_t i = 0; i < cloud_2.size(); i++) {
     pcl::PointXYZ k1_point, base_point;
     // Use the original cloud, not the transformed cloud
@@ -1784,7 +1734,6 @@ void ICP(const int k, const double nn_dist,
     ConstructICP_problem(publishers, cloud_1, cloud_2, normal_1, normal_2,
                          image_coords_1, image_coords_2, nn_dist, transform,
                          &problem);
-    //     fprintf(stdout, "problem built\n");
     // Run Ceres problem
     ceres::Solver::Options options;
     options.num_threads = 12;
@@ -1799,7 +1748,6 @@ void ICP(const int k, const double nn_dist,
     ceres::Solve(options, &problem, &summary);
     rmse =
         sqrt(summary.final_cost / static_cast<double>(summary.num_residuals));
-    // std::cout << summary.FullReport() << "\n";
     ceres::Problem::EvaluateOptions evalOptions =
         ceres::Problem::EvaluateOptions();
     residuals.clear();
@@ -1809,20 +1757,17 @@ void ICP(const int k, const double nn_dist,
 
     // Shifts cloud by calculated transform
     TransformPointCloud(&transformed_cloud, transform);
+    std::cout << "Publishing" << std::endl;
     PublishCloud(cloud_1, publishers[0]);
     PublishCloud(transformed_cloud, publishers[1]);
-    //     fprintf(stdout, "clouds published\n");
     vector<int> nearest_neigbors;
     vector<int> start_points;
-    //     VisualizeDepthImage(cloud_1,
-    //                         publishers[5]);
     KdTreeNN(nn_dist, cloud_1, transformed_cloud, normal_1, normal_2,
              image_coords_1, image_coords_2, nearest_neigbors, start_points);
-    //     fprintf(stdout, "kdtree run\n");
-    // VisualizeNN(cloud_1, transformed_cloud, nearest_neigbors, start_points,
-    // publishers[4]);
+    VisualizeNN(cloud_1, transformed_cloud, nearest_neigbors, start_points,
+    publishers[4]);
+    Sleep(1);
   }
-  fprintf(stdout, "RMSE: %f\n", rmse);
   if (final_rmse)
     *final_rmse = rmse;
 }
@@ -1873,8 +1818,6 @@ double *ICPKnownC(const int k, const vector<ros::Publisher> &publishers,
     rmse =
         sqrt(summary.final_cost / static_cast<double>(summary.num_residuals));
     printf("MSE:%g\n", rmse);
-    // ROS_INFO("Mean = %f", rmse);
-    // std::cout << summary.FullReport() << "\n";
   }
 
   return transform;
@@ -1885,9 +1828,6 @@ CloudFromVector(const vector<Eigen::Vector3f> &pointCloud,
                 const vector<int> &pixelLocs) {
 
   pcl::PointCloud<pcl::PointXYZ> cloud;
-  // Process Depth To PCL Cloud
-  // cloud.height = 480;
-  // cloud.width = 640;
   cloud.resize(pointCloud.size());
 
   for (uint i = 0; i < cloud.size(); ++i) {
@@ -1913,13 +1853,11 @@ GetCloudsSlamBag(rosbag::View::iterator it,
                  std::deque<pcl::PointCloud<pcl::PointXYZ>> *buffer1,
                  std::deque<double> *timestamps_1) {
 
-  //   cout << "slam_bag" << endl;
   PlaneFilter filter;
   KinectOpenNIDepthCam camera = KinectOpenNIDepthCam();
   filter.setDepthCamera(&camera);
   const rosbag::MessageInstance &depth_m = *it;
   sensor_msgs::ImagePtr depth_msg = depth_m.instantiate<sensor_msgs::Image>();
-  //   cout << "depth made" << endl;
   // Going to need to also get the mapping from depth to color and depth to
   // point cloud
   if (depth_msg != NULL) {
@@ -1929,13 +1867,10 @@ GetCloudsSlamBag(rosbag::View::iterator it,
                                       pointCloud, pixelLocs);
     pcl::PointCloud<pcl::PointXYZ> pcl_cloud =
         icp::CloudFromVector(pointCloud, pixelLocs);
-    //     cout << "cloud created" << endl;
     buffer1->push_back(pcl_cloud);
     timestamps_1->push_back(depth_msg->header.stamp.toSec());
-    //     cout << "pushed_back" << endl;
   }
   advance(it, 1);
-  //   cout << "advanced" << endl;
   return it;
 }
 
@@ -1951,14 +1886,10 @@ GetClouds(rosbag::View::iterator it,
   filter.setDepthCamera(&camera);
   string kinect_0 = "kinect_0";
   string kinect_1 = "kinect_1";
-  //   cout << "buffer check" << endl;
   while ((buffer1->size() == 0 || buffer2->size() == 0)) {
-    //     cout << "instantiate" << endl;
     const rosbag::MessageInstance &m = *it;
     sensor_msgs::ImagePtr imageMsg = m.instantiate<sensor_msgs::Image>();
-    // cout << imageMsg->header.frame_id << endl;
     if (imageMsg != NULL) {
-      // file << imageMsg->header.stamp.toSec() << endl;
       vector<Eigen::Vector3f> pointCloud;
       vector<int> pixelLocs;
       filter.GenerateCompletePointCloud((void *)imageMsg->data.data(),
@@ -1966,17 +1897,13 @@ GetClouds(rosbag::View::iterator it,
       pcl::PointCloud<pcl::PointXYZ> pcl_cloud =
           CloudFromVector(pointCloud, pixelLocs);
       if (imageMsg->header.frame_id == kinect_0) {
-        //         cout << "pushing back" << endl;
         buffer1->push_back(pcl_cloud);
         timestamps_1->push_back(imageMsg->header.stamp.toSec());
       } else if (imageMsg->header.frame_id == kinect_1) {
-        //         cout << "pushing back 2" << endl;
         buffer2->push_back(pcl_cloud);
         timestamps_2->push_back(imageMsg->header.stamp.toSec());
-        // cout << imageMsg->header.stamp.toSec() << endl;
       }
     }
-    //     cout << "advance" << endl;
     advance(it, 1);
   }
   return it;
@@ -1995,16 +1922,13 @@ GetCloudsOne(rosbag::View::iterator it,
   while ((buffer1->size() == 0)) {
     const rosbag::MessageInstance &m = *it;
     sensor_msgs::ImagePtr imageMsg = m.instantiate<sensor_msgs::Image>();
-    // cout << imageMsg->header.frame_id << endl;
     if (imageMsg != NULL) {
-      // file << imageMsg->header.stamp.toSec() << endl;
       vector<Eigen::Vector3f> pointCloud;
       vector<int> pixelLocs;
       filter.GenerateCompletePointCloud((void *)imageMsg->data.data(),
                                         pointCloud, pixelLocs);
       pcl::PointCloud<pcl::PointXYZ> pcl_cloud =
           CloudFromVector(pointCloud, pixelLocs);
-      //         cout << "pushing back" << endl;
       buffer1->push_back(pcl_cloud);
       timestamps_1->push_back(imageMsg->header.stamp.toSec());
     }
@@ -2023,7 +1947,6 @@ GetCloudsOneBrass(rosbag::View::iterator it,
     const rosbag::MessageInstance &m = *it;
     sensor_msgs::PointCloud2Ptr imageMsg =
         m.instantiate<sensor_msgs::PointCloud2>();
-    // cout << imageMsg->header.frame_id << endl;
     if (imageMsg != NULL) {
       pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
       pcl::PCLPointCloud2 pcl_pc2;
@@ -2047,26 +1970,21 @@ GetCloudsBag(rosbag::View::iterator it, rosbag::View::iterator end,
              double *time2) {
 
   for (uint i = 0; i < 2; i++) {
-    //     cout << "instantiate" << endl;
     const rosbag::MessageInstance &m = *it;
 
     sensor_msgs::PointCloud2Ptr cloudMsg =
         m.instantiate<sensor_msgs::PointCloud2>();
     pcl::PCLPointCloud2 pcl_pc;
     pcl::PointCloud<pcl::PointXYZ> cloud;
-    //     cout << "conversion" << endl;
     pcl_conversions::toPCL(*cloudMsg, pcl_pc);
     pcl::fromPCLPointCloud2(pcl_pc, cloud);
-    cout << cloud.size() << endl;
     if (i == 0) {
       *cloud1 = cloud;
     } else {
       *cloud2 = cloud;
     }
-    //     cout << "advance" << endl;
     advance(it, 1);
   }
-  cout << cloud1->size() << " " << cloud2->size() << endl;
   return it;
 }
 
@@ -2112,7 +2030,6 @@ rosbag::View::iterator TimeAlignedClouds(
       }
     }
   }
-  cout << best_deltaT << endl;
   // return those two as the current clouds to use
   (*cloud1) = cloud_k1;
   *cloud2 = cloud_k2;
@@ -2141,14 +2058,18 @@ OneSensorClouds(rosbag::View::iterator it, rosbag::View::iterator end,
 }
 
 void OrientCloud(pcl::PointCloud<pcl::PointXYZ> *cloud) {
+  pcl::PointCloud<pcl::PointXYZ> cloud_2;
   for (size_t i = 0; i < cloud->size(); ++i) {
     pcl::PointXYZ point = (*cloud)[i];
     pcl::PointXYZ point2;
     point2.x = point.z;
     point2.y = -point.x;
     point2.z = -point.y;
-    (*cloud)[i] = point2;
+    if (point2.x < 4.9) {
+      cloud_2.push_back(point2);
+    }
   }
+  *cloud = cloud_2;
 }
 
 rosbag::View::iterator
@@ -2181,11 +2102,8 @@ rosbag::View::iterator TimeAlignedCloudsSlamBag(
     pcl::PointCloud<pcl::PointXYZ> *cloud2, double *time1, double *time2) {
 
   // Fill the buffers
-  cout << "Time aligned clouds" << endl;
   it = GetCloudsSlamBag(it, buffer1, timestamps_1);
-  cout << " Got Clouds 1 " << endl;
   (*it2) = GetCloudsSlamBag(*it2, buffer2, timestamps_2);
-  cout << "clouds obtained" << endl;
   // Get the earliest cloud from the first kinect
   pcl::PointCloud<pcl::PointXYZ> cloud_k1 = (*buffer1)[0];
   buffer1->pop_front();
@@ -2235,20 +2153,12 @@ bool CheckChangeVel(double *pose, const int degree,
   const double angle = axis.norm();
   double angle_degree = (180 / 3.14) * angle;
   double norm = trans.norm();
-  // PrintPose(pose);
-  cout << "angle degrees: " << (180 / 3.14) * angle << endl;
-  // cout << "angle: " << angle << endl;
   double velocity =
       std::accumulate(velocity_list.begin(), velocity_list.end(), 0.0);
-  for (auto i : velocity_list) {
-    cout << i << endl;
-  }
   velocity = velocity / velocity_list.size();
-  fprintf(stdout, "Velocity: %f\n", velocity);
   if (degree > 0) {
     if (abs(velocity) < 2.5) {
       if ((angle_degree > degree)) {
-        cout << "TRUE" << endl;
         return true;
       } else {
         return false;
@@ -2367,25 +2277,16 @@ bool CheckChangeOdom(double *pose, double *previous_pose,
                      const double &timestamp_1, const double &timestamp_2,
                      const int &degree) {
   Eigen::Matrix<double, 3, 1> axis(pose[0], pose[1], pose[2]);
+  const Eigen::Vector3d trans = {pose[3], pose[4], pose[5]};
+  const double dist = fabs(trans.norm());
   const double angle = axis.norm();
-  Eigen::Matrix<double, 3, 1> axis_previous(previous_pose[0], previous_pose[1],
-                                            previous_pose[2]);
-  const double angle_previous = axis_previous.norm();
   double angle_degree = (180 / 3.14) * angle;
-  // PrintPose(pose);
-//   cout << "angle degrees: " << (180 / 3.14) * angle << endl;
-  // cout << "angle: " << angle << endl;
-  double velocity;
-  velocity = angle_previous / (timestamp_1 - timestamp_2);
-  if (abs(velocity) < .05) {
-    if ((angle_degree > degree)) {
+    if ((angle_degree > degree) || dist > .05) {
       return true;
     } else {
       return false;
     }
-  } else {
     return false;
-  }
 }
 
 bool CheckChange(double *pose, const int degree) {
@@ -2394,8 +2295,6 @@ bool CheckChange(double *pose, const int degree) {
   Eigen::Matrix<double, 3, 1> axis(pose[0], pose[1], pose[2]);
   const double angle = axis.norm();
   double angle_degree = (180 / 3.14) * angle;
-  // PrintPose(pose);
-  cout << "angle degrees: " << (180 / 3.14) * angle << endl;
   if ((dist > .5) || (angle_degree > degree)) {
     return true;
   } else {
@@ -2481,7 +2380,6 @@ void WritePoseFile(double *pose, const double &timestamp, const int &count,
                    ofstream &file) {
 
   if (file.is_open()) {
-    // cout << "Writing to bag_name" << endl;
     for (int j = 0; j < 6; j++) {
 
       file << pose[j] << "\t";

@@ -41,6 +41,13 @@ void PrintPose(double *pose) {
   cout << endl;
 }
 
+void PrintPose(vector<double> pose) {
+  for (uint i = 0; i < 6; i++) {
+    cout << pose[i] << " ";
+  }
+  cout << endl;
+}
+
 void ReadUncertaintiesFromFile(string delta_file,
                                vector<vector<double>> *uncertainty_1,
                                vector<vector<double>> *uncertainty_2) {
@@ -59,6 +66,8 @@ void ReadUncertaintiesFromFile(string delta_file,
       cout << "problem" << endl;
       break;
     } // error
+    PrintPose(u1);
+    PrintPose(u2);
     uncertainty_1->push_back(u1);
     uncertainty_2->push_back(u2);
   }
@@ -69,6 +78,7 @@ void ReadDeltasFromFile(string delta_file, vector<vector<double>> *deltas_1,
                         vector<vector<double>> *uncertainty_1,
                         vector<vector<double>> *uncertainty_2) {
   cout << " reading" << endl;
+  std::cout << delta_file << std::endl;
   std::ifstream infile(delta_file.c_str());
   std::string line;
   deltas_1->clear();
@@ -96,6 +106,8 @@ void ReadDeltasFromFile(string delta_file, vector<vector<double>> *deltas_1,
       cout << "problem" << endl;
       break;
     } // error
+    PrintPose(delta);
+    PrintPose(delta2);
     deltas_1->push_back(delta);
     deltas_2->push_back(delta2);
     uncertainty_1->push_back(u);
@@ -531,13 +543,6 @@ void PartialCalibrateRwT(const vector<vector<double>> &deltas_1,
 
       cost_function = PartialRotationErrorNumeric::Create(
           deltas_1[i], deltas_2[i], uncertaintyR_1[i], uncertaintyR_2[i]);
-
-      problem.AddResidualBlock(cost_function,
-                               NULL, // squared loss
-                               transform);
-      cost_function = PartialRotWTransErrorNumeric::Create(
-          deltasT_1[i], deltasT_2[i], TuncertaintyR_1[i], TuncertaintyR_2[i],
-          TuncertaintyT_1[i], TuncertaintyT_2[i]);
       problem.AddResidualBlock(cost_function,
                                NULL, // squared loss
                                transform);
@@ -546,6 +551,15 @@ void PartialCalibrateRwT(const vector<vector<double>> &deltas_1,
           deltas_1[i], deltas_2[i], uncertaintyR_1[i], uncertaintyR_2[i],
           uncertaintyT_1[i], uncertaintyT_2[i]);
 
+      problem.AddResidualBlock(cost_function,
+                               NULL, // squared loss
+                               transform);
+    }
+    for (size_t i = 0; i < deltasT_1.size(); i++) {
+      ceres::CostFunction *cost_function = NULL;
+      cost_function = PartialRotWTransErrorNumeric::Create(
+        deltasT_1[i], deltasT_2[i], TuncertaintyR_1[i], TuncertaintyR_2[i],
+        TuncertaintyT_1[i], TuncertaintyT_2[i]);
       problem.AddResidualBlock(cost_function,
                                NULL, // squared loss
                                transform);

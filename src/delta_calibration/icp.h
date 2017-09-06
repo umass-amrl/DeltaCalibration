@@ -101,6 +101,8 @@ template <class T>
 Eigen::Matrix<T, 3, 1> TransformPointInv(const Eigen::Matrix<T, 3, 1> &point,
                                          const T transform[6]);
 
+double *InvertTransform(double *transform);
+
 void PublishCloud(const pcl::PointCloud<pcl::PointXYZ> &cloud,
                   ros::Publisher publisher);
 

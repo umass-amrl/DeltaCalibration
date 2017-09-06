@@ -35,10 +35,9 @@ void TransformFromFile(string transform_file, double *transform) {
   istringstream ss(transform_string);
   int i = 0;
   string z;
-  getline(ss, z, ' ');
   while (!ss.eof()) {
     string x;
-    getline(ss, x, ' ');
+    getline(ss, x, '\t');
     transform[i] = atof(x.c_str());
     cout << transform[i] << "\t";
     ++i;
@@ -60,21 +59,29 @@ void FindZ(string bag_file, string transform_file,
   bag.open(bag_file, rosbag::bagmode::Read);
   std::vector<std::string> topics;
   std::vector<std::string> odom_topics;
-  odom_topics.push_back(std::string("/Cobot/Kinect/Depth"));
+  odom_topics.push_back(std::string("/camera/depth/points"));
   rosbag::View odom_view(bag, rosbag::TopicQuery(odom_topics));
   rosbag::View::iterator bag_it = odom_view.begin();
   rosbag::View::iterator end = odom_view.end();
   std::deque<pcl::PointCloud<pcl::PointXYZ>> buffer;
   std::deque<double> timestamps;
-  pcl::PointCloud<pcl::PointXYZ> cloud;
+  pcl::PointCloud<pcl::PointXYZ> cloud, cloud2, cloud3;
   double time;
   // Get Cloud
-  bag_it = OneSensorClouds(bag_it, end, &buffer, &timestamps, &cloud, &time);
-
+  bag_it = OneSensorCloudsBrass(bag_it, end, &buffer, &timestamps, &cloud, &time);
+  cloud2 = cloud;
+  cloud3 = cloud;
+  TransformPointCloudInv(&cloud2, transform);
+//   TransformPointCloud(&cloud3, transform);
+//   while (true) {
+//   PublishCloud(cloud3, cloud_pub_1);
+//   PublishCloud(cloud2, cloud_pub_2);
+//   }
   // Naive Solution find the greatest z value as the height
   pcl::PointXYZ min, max;
-  pcl::getMinMax3D(cloud, min, max);
+  pcl::getMinMax3D(cloud2, min, max);
   cout << "Greatest Z: " << max << endl;
+  cout << "Min Z: " << min << endl;
 }
 
 int main(int argc, char **argv) {
