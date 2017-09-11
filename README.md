@@ -5,7 +5,7 @@ This package includes code for calibrating Microsoft Kinect sensors, and for rec
 
 Authors: Jarrett Holtz (jaholtz@cs.umass.edu), Joydeep Biswas
 
-License: Decide on a license (LGPL)
+License: LGPL
 
 ### COMPILATION:
 
