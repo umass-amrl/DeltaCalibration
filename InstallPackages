@@ -2,14 +2,11 @@
 sudo apt-get install subversion g++ libqt4-dev cmake libpopt-dev libiw-dev \
     libglibmm-2.4-dev libgtk2.0-dev libgtkmm-2.4-dev libusb-1.0-0-dev \
     liblua5.1-dev libtk-img libeigen2-dev libsdl1.2-dev libsdl-gfx1.2-dev \
-    python-imaging-tk tix tix-dev libglew1.5-dev wmctrl espeak python-scipy \
-    python-numpy libeigen3-dev libsdl-ttf2.0-dev sox python-alsaaudio \
-    freeglut3-dev libncurses5-dev libjpeg8-dev python-wxtools python-serial \
-    python-qt4 libgoogle-perftools-dev libusb-dev pyqt4-dev-tools \
-    python-pip python-qt4-dev fonts-droid rake python-nltk kcachegrind \
-    valgrind python-matplotlib libeigen3-dev libsuitesparse-dev \
+    python-imaging-tk tix tix-dev libglew1.5-dev wmctrl libeigen3-dev libsuitesparse-dev \
     libblas-dev liblapack-dev libprotobuf-dev protobuf-compiler \
     libopenmpi-dev libxml2-dev && \
+
+sudo apt-get install libpcl-1.7-all-dev
 # sudo pip install acpi || { echo 'Error: Installation failed' >&2; exit 1; }
 UBUNTU_VERSION=`lsb_release -rs`
 UBUNTU_OLDER_THAN_TRUSTY=`echo ${UBUNTU_VERSION}"<14.04" | bc`
@@ -27,17 +24,6 @@ else
     sudo apt-get install libgoogle-glog-dev libgflags-dev || \
 	{ echo 'Error: glog and gflags installation failed' >&2; exit 1; }
 fi
-# pushd ../cobot_python/task_dialog && python installMaxent.py  || \
-#     { echo 'Error: installMaxent failed' >&2; exit 1; }
-# popd
-# pushd src/libraries/CRF++-0.58 && ./configure &&\
-#     make -j`nproc` && sudo make install && cd python &&\
-#     sudo python setup.py install || \
-#     { echo 'Error: crfpp failed' >&2; exit 1; }
-# popd
-# pushd src/libraries/re2 && make -j`nproc` && sudo make install || \
-#     { echo 'Error: re2 failed' >&2; exit 1; }
-# popd
 pushd src/libraries/ceres-solver && mkdir -p build && cd build && cmake .. && \
     sudo make install -j`nproc` || \
     { echo 'Error: ceres failed' >&2; exit 1; }

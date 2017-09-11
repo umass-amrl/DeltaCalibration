@@ -83,7 +83,7 @@ SET(FSPF_SRCS
 )
 ADD_LIBRARY(shared_libraries SHARED ${SHARED_SRCS} ${HW_SRCS})
 ADD_DEPENDENCIES(shared_libraries rosbuild_precompile)
-TARGET_LINK_LIBRARIES(shared_libraries shared_libraries ${libs})
+TARGET_LINK_LIBRARIES(shared_libraries ${libs})
 
 ADD_LIBRARY(fspf_library ${FSPF_SRCS})
 ADD_DEPENDENCIES(fspf_library shared_libraries)

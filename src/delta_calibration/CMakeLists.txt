@@ -28,26 +28,6 @@ ADD_DEPENDENCIES(${target}
     ceres
     shared_libraries
     fspf_library
-    perception_library
-    ${OpenCV_LIBRARIES})
-TARGET_LINK_LIBRARIES(${target}
-    ceres
-    shared_libraries
-    fspf_library
-    ${OpenCV_LIBRARIES} ${libs})
-
-SET(target calibration_watcher)
-ROSBUILD_ADD_EXECUTABLE(${target}
-    icp.cpp
-    delta_calibration.cpp
-    partial_calibrate.cpp
-    calibration_watcher.cpp
-    ../perception_tools/kdtree.cpp)
-ADD_DEPENDENCIES(${target}
-    ceres
-    shared_libraries
-    fspf_library
-    perception_library
     ${OpenCV_LIBRARIES})
 TARGET_LINK_LIBRARIES(${target}
     ceres
@@ -66,7 +46,6 @@ ADD_DEPENDENCIES(${target}
 ceres
 shared_libraries
 fspf_library
-perception_library
 ${OpenCV_LIBRARIES})
 TARGET_LINK_LIBRARIES(${target}
 ceres
@@ -84,7 +63,6 @@ ADD_DEPENDENCIES(${target}
     ceres
     shared_libraries
     fspf_library
-    perception_library
     ${OpenCV_LIBRARIES})
 TARGET_LINK_LIBRARIES(${target}
     ceres
@@ -102,7 +80,6 @@ ADD_DEPENDENCIES(${target}
     ceres
     shared_libraries
     fspf_library
-    perception_library
     ${OpenCV_LIBRARIES})
 TARGET_LINK_LIBRARIES(${target}
     ceres
@@ -120,7 +97,6 @@ ADD_DEPENDENCIES(${target}
     ceres
     shared_libraries
     fspf_library
-    perception_library
     ${OpenCV_LIBRARIES})
 TARGET_LINK_LIBRARIES(${target}
     ceres
@@ -153,7 +129,6 @@ ADD_DEPENDENCIES(${target}
     ceres
     shared_libraries
     fspf_library
-    perception_library
     ${OpenCV_LIBRARIES})
 TARGET_LINK_LIBRARIES(${target}
     ceres
@@ -170,7 +145,6 @@ ADD_DEPENDENCIES(${target}
     ceres
     shared_libraries
     fspf_library
-    perception_library
     ${OpenCV_LIBRARIES})
 TARGET_LINK_LIBRARIES(${target}
     ceres
