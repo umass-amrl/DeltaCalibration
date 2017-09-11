@@ -5,7 +5,7 @@ This package includes code for calibrating Microsoft Kinect sensors, and for rec
 
 Authors: Jarrett Holtz (jaholtz@cs.umass.edu), Joydeep Biswas
 
-License: Decide on a license (LGPL)
+License: LGPL
 
 ### COMPILATION:
 
@@ -23,7 +23,7 @@ If dependences are not installed
 ./InstallPackages
 
 mkdir build
-make
+make calibration
 ```
 ### USAGE:
 DeltaCalibration requires three steps for extrinsic calibration. Data collection, calculation of DeltaTransforms, and finally extrinsic calibration from DeltaTransforms. In this release we include two sample datasets from the Kobuki Turtlebot. One taken from a fully informative scene, and one from multiple partially informative scenes. Instructions for running the full calibratino stack with these datasets are below, as well as instructions for calibrating with two sensors.
@@ -40,7 +40,7 @@ where -t 1 specifices turtlebot mode, -d 5 specifies a minimum rotational DeltaT
 
 Calibration
 ```bash
-./bin/delta_calibrate -f 'path to rotation file' -g 'path to translation file' -t 1
+./bin/delta_calibrate -t 1 -f 'path to rotation file' -g 'path to translation file'
 ```
 Which will output an extrinsic calibration file with the extension '.extrinsics'
 
@@ -71,7 +71,7 @@ Merge Pose and Uncertainty Files
 
 Calibration
 ```bash
-./bin/delta_calibrate -f 'path to rotation file' -g 'path to translation file' -t 1
+./bin/delta_calibrate -t 1 -f 'path to rotation file' -g 'path to translation file'
 ```
 Which will output an extrinsic calibration file with the extension '.extrinsics'
 
