@@ -1757,7 +1757,6 @@ void ICP(const int k, const double nn_dist,
 
     // Shifts cloud by calculated transform
     TransformPointCloud(&transformed_cloud, transform);
-    std::cout << "Publishing" << std::endl;
     PublishCloud(cloud_1, publishers[0]);
     PublishCloud(transformed_cloud, publishers[1]);
     vector<int> nearest_neigbors;
@@ -2157,15 +2156,15 @@ bool CheckChangeVel(double *pose, const int degree,
       std::accumulate(velocity_list.begin(), velocity_list.end(), 0.0);
   velocity = velocity / velocity_list.size();
   if (degree > 0) {
-    if (abs(velocity) < 2.5) {
-      if ((angle_degree > degree)) {
+    if (fabs(velocity) < 2.5) {
+      if ((fabs(angle_degree) > fabs(degree))) {
         return true;
       } else {
         return false;
       }
     }
   } else {
-    if ((angle_degree > degree) && norm > trans_eps) {
+    if ((fabs(angle_degree) > fabs(degree)) && norm > trans_eps) {
       return true;
     } else {
       return false;
