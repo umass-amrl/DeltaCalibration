@@ -91,11 +91,11 @@ void WritePoseFile(double *pose, const double &timestamp, const int &count,
                    ofstream &file) {
   if (file.is_open()) {
     for (int j = 0; j < 6; j++) {
-//       if (pose[j] >= .01) {
+      if (fabs(pose[j]) >= .001) {
         file << pose[j] << "\t";
-//       } else {
-//         file << 0 << "\t";
-//       }
+      } else {
+        file << 0 << "\t";
+      }
     }
   }
   file << std::setprecision(20) << timestamp << "\t" << count;
@@ -1629,12 +1629,13 @@ void DeltaCalculationOpenniOdom(const string& bag_name,
     // If there has been sufficient change update keyframe and save deltas
     bool k1_change = CheckChangeVel(variables->k1_combined_transform, degree,
                                     variables->k1_velocity_list);
-    bool k2_change = CheckChangeOdom(odom_delta, previous_odom_delta,
-                                     current_odom[0], previous_odom[0], degree);
+
+    bool k2_change = CheckChangeVel(odom_delta, degree,
+                                    variables->k1_velocity_list);
     // If there is enough change
     if (k1_change && k2_change) {
       dist_okay = false;
-      double *odom_delta = DeltaFromOdom(keyframe_odom, current_odom);
+
       keyframe_odom = current_odom;
       vector<double> pose0(6, 0.0);
 
@@ -1643,32 +1644,31 @@ void DeltaCalculationOpenniOdom(const string& bag_name,
       variables->k1_key_normal = k1_normal;
       variables->keys.push_back(count);
 
-
       // Extract planes to use for uncertainty calculation
       vector<Eigen::Vector4d> plane_normals;
       vector<Eigen::Vector3d> plane_centroids;
       ExtractPlanes(k1_cloud, &plane_normals, &plane_centroids);
 
-//       const Eigen::Vector3d rotation_1 = {variables->k1_combined_transform[0],
-//                                     variables->k1_combined_transform[1],
-//                                     variables->k1_combined_transform[2]};
+      const Eigen::Vector3d rotation_1 = {variables->k1_combined_transform[0],
+                                    variables->k1_combined_transform[1],
+                                    variables->k1_combined_transform[2]};
 //       const Eigen::Vector3d translation_1 = {variables->k1_combined_transform[3],
 //                                       variables->k1_combined_transform[4],
 //                                       variables->k1_combined_transform[5]};
-//       const Eigen::Vector3d rotation_2 = {odom_delta[0],
-//                                     odom_delta[1],
-//                                     odom_delta[2]};
+      const Eigen::Vector3d rotation_2 = {odom_delta[0],
+                                    odom_delta[1],
+                                    odom_delta[2]};
 //       const Eigen::Vector3d translation_2 = {odom_delta[3],
 //                                       odom_delta[4],
 //                                       odom_delta[5]};
-//       const double rotation_1_mag = fabs(rotation_1.norm());
-//       const double rotation_2_mag = fabs(rotation_2.norm());
+      const double rotation_1_mag = fabs(rotation_1.norm());
+      const double rotation_2_mag = fabs(rotation_2.norm());
 //       const double translation_1_mag = fabs(translation_1.norm());
 //       const double translation_2_mag = fabs(translation_2.norm());
-//       const double rotation_difference = fabs(rotation_1_mag - rotation_2_mag);
+      const double rotation_difference = fabs(rotation_1_mag - rotation_2_mag);
 //       const double translation_difference = fabs(translation_1_mag
-//           - translation_2_mag);
-//       if (rotation_difference < .05 && translation_difference < .04) {
+ //         - translation_2_mag);
+      if ((rotation_difference < rotation_1_mag || rotation_1_mag < degree)) {
         // Calculate the uncertainty
         if (uncertainty) {
           Eigen::Vector3d uncertainty_t;
@@ -1678,9 +1678,9 @@ void DeltaCalculationOpenniOdom(const string& bag_name,
 
           // Writes uncertainties to files
           WriteUncertaintyFile(uncertainty_t, uncertaintyT_file);
-          pose_file << "\t";
+          uncertaintyT_file << "\t";
           WriteUncertaintyFile(uncertainty_r, uncertaintyR_file);
-          pose_file << "\t";
+          uncertaintyR_file << "\t";
           WriteUncertaintyFile(empty, uncertaintyT_file);
           WriteUncertaintyFile(empty, uncertaintyR_file);
           uncertaintyR_file << endl;
@@ -1707,7 +1707,7 @@ void DeltaCalculationOpenniOdom(const string& bag_name,
         pose_file << "\t";
         WritePoseFile(odom_delta, variables->k1_timestamp, count, pose_file);
         pose_file << endl;
-//       }
+      }
 
       // Zero Combined transforms
       std::copy(pose0.begin(), pose0.end(), variables->k1_combined_transform);
