@@ -59,7 +59,7 @@ vector<double> TransformOdom(
     double* transform) {
 
   // Create the affine transform from the transform
-  Eigen::Matrix<double,3,1> axis(-transform[0], -transform[1], -transform[2]);
+  Eigen::Matrix<double,3,1> axis(transform[0], transform[1], transform[2]);
   const double angle = axis.norm();
   if(angle != 0) {
     axis = axis / angle;
@@ -86,7 +86,7 @@ vector<double> TransformOdom(
 
   vector<double> output;
   output.push_back(odom[1] - transform[3]);
-  output.push_back(odom[2] + transform[4]);
+  output.push_back(odom[2] - transform[4]);
   output.push_back(odom[3] + transform[5]);
   output.push_back(final_quat->x());
   output.push_back(final_quat->y());
@@ -121,8 +121,8 @@ void VisualizePoses(const string& bag_file,
   rosbag::View::iterator odom_it = odom_view.begin();
   rosbag::View::iterator odom_end = odom_view.end();
 
-  vector<double> odom;
-  odom_it = OdomFromBag(odom_it, odom_end, &odom);
+  vector<double> odom = {0,0,0,0,0,0,0, 1};
+//   odom_it = OdomFromBag(odom_it, odom_end, &odom);
   cout << "finished reading from bag" << endl;
   // Transform the pose based on the calculated extrinsic transform
   vector<double> sensor_pose = odom;

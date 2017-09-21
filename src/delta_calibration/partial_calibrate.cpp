@@ -539,21 +539,21 @@ void PartialCalibrateRwT(const vector<vector<double>> &deltas_1,
     // Construct ICP problem
     ceres::Problem problem;
     for (size_t i = 0; i < deltas_1.size(); i++) {
-      ceres::CostFunction *cost_function = NULL;
+//       ceres::CostFunction *cost_function = NULL;
 
-      cost_function = PartialRotationErrorNumeric::Create(
-          deltas_1[i], deltas_2[i], uncertaintyR_1[i], uncertaintyR_2[i]);
-      problem.AddResidualBlock(cost_function,
-                               NULL, // squared loss
-                               transform);
+//       cost_function = PartialRotationErrorNumeric::Create(
+//           deltas_1[i], deltas_2[i], uncertaintyR_1[i], uncertaintyR_2[i]);
+//       problem.AddResidualBlock(cost_function,
+//                                NULL, // squared loss
+//                                transform);
 
-      cost_function = PartialTranslationErrorNumeric::Create(
-          deltas_1[i], deltas_2[i], uncertaintyR_1[i], uncertaintyR_2[i],
-          uncertaintyT_1[i], uncertaintyT_2[i]);
-
-      problem.AddResidualBlock(cost_function,
-                               NULL, // squared loss
-                               transform);
+//         cost_function = PartialTranslationErrorNumeric::Create(
+//             deltas_1[i], deltas_2[i], uncertaintyR_1[i], uncertaintyR_2[i],
+//             uncertaintyT_1[i], uncertaintyT_2[i]);
+//
+//         problem.AddResidualBlock(cost_function,
+//                                 NULL, // squared loss
+//                                 transform);
     }
     for (size_t i = 0; i < deltasT_1.size(); i++) {
       ceres::CostFunction *cost_function = NULL;

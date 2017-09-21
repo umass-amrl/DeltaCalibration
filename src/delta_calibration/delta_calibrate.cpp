@@ -274,23 +274,30 @@ int main(int argc, char **argv) {
       StripUncertainty(TuncertaintyT_2[i], TuncertaintyR_2[i],
                        &deltasT_2[i]);
     }
-//     PartialCalibrateR(deltas_1, uncertaintyR_1, uncertaintyT_1, deltas_2,
-//                       uncertaintyR_2, uncertaintyT_2, transform, RMSE);
-//     const double x_r = transform[0];
-//     const double y_r = transform[1];
+    PartialCalibrateR(deltas_1, uncertaintyR_1, uncertaintyT_1, deltas_2,
+                      uncertaintyR_2, uncertaintyT_2, transform, RMSE);
+    const double x_r = transform[0];
+    const double y_r = transform[1];
+    transform[0] = 0;
+    transform[1] = 0;
+    transform[2] = 0;
     PartialCalibrateRwT(deltas_1, uncertaintyR_1, uncertaintyT_1, deltas_2,
                       uncertaintyR_2, uncertaintyT_2, deltasT_1,
                       TuncertaintyR_1, TuncertaintyT_1, deltasT_2,
                       TuncertaintyR_2, TuncertaintyT_2, transform, RMSE);
-//     transform[0] = x_r;
-//     transform[1] = y_r;
-//     const double z_r = transform[2];
-//     PartialCalibrateT(deltas_1, uncertaintyR_1, uncertaintyT_1, deltas_2,
-//                       uncertaintyR_2, uncertaintyT_2, transform, RMSE);
+    transform[0] = x_r;
+    transform[1] = y_r;
+//     transform[3] = 0;
+//     transform[4] = 0;
+//     transform[5] = 0;
+    const double z_r = transform[2];
+    PartialCalibrateT(deltas_1, uncertaintyR_1, uncertaintyT_1, deltas_2,
+                      uncertaintyR_2, uncertaintyT_2, transform, RMSE);
+    transform[0] = x_r;
+    transform[1] = y_r;
+    transform[2] = z_r;
+    transform[5] = 0;
     const float z = -FindZ(filename_str, transform);
-//     transform[0] = x_r;
-//     transform[1] = y_r;
-//     transform[2] = z_r;
     transform[5] = z;
   } else {
     double *RMSE = 0;

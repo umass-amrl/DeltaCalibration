@@ -804,57 +804,69 @@ void DeltaCalculationOpenni(const string& bag_name,
       variables->k2_key_normal = k2_normal;
       variables->k1_key_normal = k1_normal;
       variables->keys.push_back(count);
+      // Extract planes to use for uncertainty calculation
+      vector<Eigen::Vector4d> plane_normals;
+      vector<Eigen::Vector3d> plane_centroids;
+      ExtractPlanes(k1_cloud, &plane_normals, &plane_centroids);
 
-      // Calculate the uncertainty
-      if (uncertainty) {
-        // Extract planes to use for uncertainty calculation
-        vector<Eigen::Vector4d> plane_normals;
-        vector<Eigen::Vector3d> plane_centroids;
-        ExtractPlanes(k1_cloud, &plane_normals, &plane_centroids);
+      const Eigen::Vector3d rotation_1 = {variables->k1_combined_transform[0],
+        variables->k1_combined_transform[1],
+        variables->k1_combined_transform[2]};
+        const Eigen::Vector3d rotation_2 = {variables->k2_combined_transform[0],
+            variables->k2_combined_transform[1],
+            variables->k2_combined_transform[2]};
+      //       const Eigen::Vector3d translation_2 = {odom_delta[3],
+      //                                       odom_delta[4],
+      //                                       odom_delta[5]};
+      const double rotation_1_mag = fabs(rotation_1.norm());
+      const double rotation_2_mag = fabs(rotation_2.norm());
+      //       const double translation_1_mag = fabs(translation_1.norm());
+      //       const double translation_2_mag = fabs(translation_2.norm());
+      const double rotation_difference = fabs(rotation_1_mag - rotation_2_mag);
+      //       const double translation_difference = fabs(translation_1_mag
+      //         - translation_2_mag);
+      if ((rotation_difference < rotation_1_mag || rotation_1_mag < degree)) {
+        // Calculate the uncertainty
+        if (uncertainty) {
+          Eigen::Vector3d uncertainty_t;
+          Eigen::Vector3d uncertainty_r;
+          Eigen::Vector3d empty = {0,0,0};
+          ExtractUncertainty(plane_normals, &uncertainty_t, &uncertainty_r);
 
-        Eigen::Vector3d uncertainty_t;
-        Eigen::Vector3d uncertainty_r;
-        ExtractUncertainty(plane_normals, &uncertainty_t, &uncertainty_r);
+          // Writes uncertainties to files
+          WriteUncertaintyFile(uncertainty_t, uncertaintyT_file);
+          uncertaintyT_file << "\t";
+          WriteUncertaintyFile(uncertainty_r, uncertaintyR_file);
+          uncertaintyR_file << "\t";
+          WriteUncertaintyFile(empty, uncertaintyT_file);
+          WriteUncertaintyFile(empty, uncertaintyR_file);
+          uncertaintyR_file << endl;
+          uncertaintyT_file << endl;
 
-        // Writes uncertainties to files
-        WriteUncertaintyFile(uncertainty_t, uncertaintyT_file);
-        WriteUncertaintyFile(uncertainty_r, uncertaintyR_file);
-        // TODO(jaholtz)
-        // Potentially need to write zero uncertainties for the odom so they are
-        // available, or have code fill them in for odometry based calibrations.
-
-        // Remove the uncertain portions of the transform from the transform.
-//         StripUncertainty(uncertainty_t, uncertainty_r,
-//                          variables->k1_combined_transform);
-
-        // Do the same for the second transform
-        ExtractPlanes(k2_cloud, &plane_normals, &plane_centroids);
-        ExtractUncertainty(plane_normals, &uncertainty_t, &uncertainty_r);
-        // Writes uncertainties to files
-        WriteUncertaintyFile(uncertainty_t, uncertaintyT_file);
-        WriteUncertaintyFile(uncertainty_r, uncertaintyR_file);
-        // Remove the uncertain portions of the transform from the transform.
-//         StripUncertainty(uncertainty_t, uncertainty_r,
-//                          variables->k2_combined_transform);
-        uncertaintyR_file << endl;
-        uncertaintyT_file << endl;
-      } else {
-        Eigen::Vector3d empty = {0,0,0};
-        // Writes uncertainties to files
-        WriteUncertaintyFile(empty, uncertaintyT_file);
-        WriteUncertaintyFile(empty, uncertaintyR_file);
-        WriteUncertaintyFile(empty, uncertaintyT_file);
-        WriteUncertaintyFile(empty, uncertaintyR_file);
-        uncertaintyR_file << endl;
-        uncertaintyT_file << endl;
+          // Remove the uncertain portions of the transform from the transform.
+          //           StripUncertainty(uncertainty_t, uncertainty_r,
+          //             variables->k1_combined_transform);
+        } else {
+          Eigen::Vector3d empty = {0,0,0};
+          // Writes uncertainties to files
+          WriteUncertaintyFile(empty, uncertaintyT_file);
+          uncertaintyT_file << "\t";
+          WriteUncertaintyFile(empty, uncertaintyR_file);
+          uncertaintyR_file << "\t";
+          WriteUncertaintyFile(empty, uncertaintyT_file);
+          WriteUncertaintyFile(empty, uncertaintyR_file);
+          uncertaintyR_file << endl;
+          uncertaintyT_file << endl;
+        }
+        // Writes both deltas to the same file
+        WritePoseFile(variables->k1_combined_transform, variables->k1_timestamp,
+                      count, pose_file);
+        pose_file << "\t";
+        WritePoseFile(variables->k2_combined_transform,
+                      variables->k1_timestamp, count, pose_file);
+        pose_file << endl;
       }
 
-      WritePoseFile(variables->k1_combined_transform, variables->k1_timestamp,
-                    count, pose_file);
-      pose_file << "\t";
-      WritePoseFile(variables->k2_combined_transform, variables->k2_timestamp,
-                    count, pose_file);
-      pose_file << endl;
 
       // Transform the clouds and then write them to object files
       pcl::PointCloud<pcl::PointXYZ> temp_cloud1 = k1_cloud;

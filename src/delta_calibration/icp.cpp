@@ -25,8 +25,8 @@ namespace icp {
 
 bool first_nn = true;
 int count = 0;
-const float nn_dist = .1;
-float neighbor_dist = .1;
+const float nn_dist = .05;
+float neighbor_dist = .05;
 vector<int> x_pos;
 vector<int> y_pos;
 
