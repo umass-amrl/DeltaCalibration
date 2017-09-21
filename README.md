@@ -66,7 +66,7 @@ where '-u 1' specifices that the transforms may have uncertainty.
 
 Merge Pose and Uncertainty Files
 ```bash
-./merge_files 'path to folder with files to merge'
+./merge_deltas.sh 'path to folder with files to merge'
 ```
 
 Calibration
