@@ -100,6 +100,16 @@ Visualizing Calibration
 ./bin/check_transform -B 'bagfile' -T 'transform file'
 ```
 
+#### Sample Datasets
+Two sample Turtlebot datasets are provided at the following links. One dataset is fully informative, and the other takes data from partially informative scenes.
+
+https://amrl.cs.umass.edu/datasets/delta-calibration/turtlebot_full_rotate.bag
+https://amrl.cs.umass.edu/datasets/delta-calibration/turtlebot_full_translate.bag
+https://amrl.cs.umass.edu/datasets/delta-calibration/turtlebot_partial1_rotate.bag
+https://amrl.cs.umass.edu/datasets/delta-calibration/turtlebot_partial1_translate.bag
+https://amrl.cs.umass.edu/datasets/delta-calibration/turtlebot_partial2_rotate.bag
+https://amrl.cs.umass.edu/datasets/delta-calibration/turtlebot_partial2_translate.bag
+
 #### Recording Turtlebot Data
 These instructions will run a number of Turtlebot packages, and a single c++ executable which will direct the Turtlebot to perform frontier exploration, recording either a number of partially informative datasets, or a single fully informative dataset depending on what the Turtlebot identifies in it's environment.
 
