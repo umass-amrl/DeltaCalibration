@@ -122,4 +122,4 @@ This will output a number of bagfiles, one pair for each partially informative s
 
 ### Publications
 For more information on calibration from partially informative scenes and applying this work to your platform you can view the DeltaCalibration publication linked below.
-(Publication Link)
+https://www.joydeepb.com/Publications/delta_calibration.pdf
